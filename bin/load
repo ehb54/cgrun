@@ -19,48 +19,80 @@ if ( !$input ) {
 
 $output = (object)[];
 
-## process inputs here to produce output
-
 include "genapp.php";
 
 $genapp = new GenApp( $input, $output );
 
-## test message
-$response =
-    json_decode(
-        $genapp->tcpquestion(
-            '{
-                "id" : "q1"
-                ,"title" : "are you sure?"
-                ,"text" : "<p>header text.</p><hr>"
-                ,"fields" : [
-                    {
-                        "id" : "l1"
-                        ,"type" : "label"
-                        ,"label" : "<center>this is label text</center>"
-                    }
-                    ,{
-                        "id" : "t1"
-                        ,"type" : "text"
-                        ,"label" : "tell me your name:"
-                    }
-                    ,{
-                        "id" : "cb1"
-                        ,"type" : "checkbox"
-                        ,"label" : "are you sure about the speed of light?"
-                    }
-                 ]
-            }
-        ' )
-    );
+## process inputs here to produce output
 
 ## does the project already exist
 
+if ( file_exists( "_loaded" ) ) {
+    $response =
+        json_decode(
+            $genapp->tcpquestion(
+                [
+                 "id"           => "q1"
+                 ,"title"       => "<h5>Project '$input->_project' is not empty</h5>"
+                 ,"icon"        => "warning.png"
+                 ,"text"        => ""
+                 ,"timeouttext" => "The time to respond has expired, please search again."
+                 ,"buttons"     => [ "Erase previous results", "Cancel" ]
+                 ,"fields" => [
+                     [
+                      "id"          => "l1"
+                      ,"type"       => "label"
+                      ,"label"      => "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Previous results will be permenantly removed!"
+                      ,"align"      => "center"
+                     ]
+                 ]
+                ]
 
+            )
+        );
+
+    
+    if ( $response->_response->button == "cancel" ) {
+        echo '{"_message":{"icon":"information.png","text":"Canceled"}}';
+        exit;
+    }
+}
+
+## check if proper file loaded
+
+$cgfile   = $input->cgfile[0];
+$cgfilebn = basename( $cgfile );
+$res      = $genapp->run_cmd( "file $cgfile" );
+
+if ( strpos( $res, "gzip compressed data" ) === false ) {
+    echo '{"_message":{"icon":"toast.png","text":"The provided CHARMM-GUI output file <i>' . $cgfilebn . '</i> does not appear to be in the correct format"}}';
+    exit;
+}
+    
+## attempt to extract
+
+$genapp->run_cmd( "[ -d \"charmm-gui\" ] && rm -fr charmm-gui; mkdir charmm-gui && cd charmm-gui && tar zxf $cgfile --strip-components=1", false );
+
+## check for expected namd directory
+
+if ( !is_dir( "charmm-gui/namd" ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"The extracted CHARMM-GUI output file <i>' . $cgfilebn . '</i> does not not contain a namd directory.<br>Are you certain you checked NAMD under Input Generation Options when running CHARMM-GUI?"}}';
+    exit;
+}
+    
+
+## looks ok so far... write loaded file
+try {
+    file_put_contents( "_loaded", $input->desc . "\n" );
+} catch (Exception $e ) {
+    echo '{"_message":{"icon":"toast.png","text":Error storing load information"}}';
+    exit;
+}
 
 ## log results to textarea
 
-$output->{'_textarea'} = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
-$output->{'_textarea'} .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
+$output->_textarea = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
+$output->_textarea .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
+$output->_textarea .= $res . "\n";
 
 echo json_encode( $output );
