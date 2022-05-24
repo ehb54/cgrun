@@ -1,0 +1,24 @@
+# this is a project menu file
+{
+    "menu" : [
+        { 
+            "id"      : "cgrun",
+            "label"   : "Run",
+            "icon"    : "pngs/simulate.png",
+            "modules" : [ 
+                { 
+                    "id"    : "load",
+                    "label" : "Load"
+                }
+                ,{ 
+                    "id"    : "equilibration",
+                    "label" : "Equilibration"
+                }
+                ,{ 
+                    "id"    : "production",
+                    "label" : "Production"
+                }
+            ]
+        }
+    ]
+}

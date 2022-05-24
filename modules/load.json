@@ -1,0 +1,51 @@
+{
+    "moduleid"    : "load"
+    ,"label"      : "Load"
+    ,"help"       : "Load and validate CHARMM-GUI output file"
+    ,"executable" : "load"
+#    ,"resource"   : "docker-local"
+#    ,"dependencies" : [ 
+#        { "base" : "python" }
+#        ,{ "file" : "mass_load.py" }
+# comment above 2 lines and uncomment 2 lines below for perl executable
+#        { "base" : "perl" }
+#        ,{ "cpan" : "JSON" }
+#    ]
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Load CHARMM-GUI results"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+        ,{
+            "role"              : "input"
+            ,"id"               : "cgfile"
+            ,"label"            : "CHARMM-GUI output file"
+            ,"type"             : "lrfile"
+            ,"help"             : "This file should be a tar.gz file produced by CHARMM-GUI with Input Generation Options: NAMD checked"
+            ,"required"         : "true"
+        }
+        ,{
+            "role"              : "input"
+            ,"id"               : "pname"
+            ,"label"            : "Project name"
+            ,"type"             : "text"
+            ,"required"         : "true"
+            ,"help"             : "Name for this project - only letters, numbers and underscores are allowed"
+            ,"pattern"          : "[a-zA-Z0-9_]+"
+            ,"specifiedproject" : ""
+        }
+        ,{
+            "role"              : "input"
+            ,"id"               : "desc"
+            ,"label"            : "Description"
+            ,"type"             : "textarea"
+            ,"required"         : "true"
+            ,"help"             : "Enter description information about this project"
+        }
+    ]
+}

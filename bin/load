@@ -1,0 +1,66 @@
+#!/usr/local/bin/php
+<?php
+
+$self = __FILE__;
+
+if ( count( $argv ) != 2 ) {
+    echo '{"error":"$self requires a JSON input object"}';
+    exit;
+}
+
+$json_input = $argv[1];
+
+$input = json_decode( $json_input );
+
+if ( !$input ) {
+    echo '{"error":"$self - invalid JSON."}';
+    exit;
+}
+
+$output = (object)[];
+
+## process inputs here to produce output
+
+include "genapp.php";
+
+$genapp = new GenApp( $input, $output );
+
+## test message
+$response =
+    json_decode(
+        $genapp->tcpquestion(
+            '{
+                "id" : "q1"
+                ,"title" : "are you sure?"
+                ,"text" : "<p>header text.</p><hr>"
+                ,"fields" : [
+                    {
+                        "id" : "l1"
+                        ,"type" : "label"
+                        ,"label" : "<center>this is label text</center>"
+                    }
+                    ,{
+                        "id" : "t1"
+                        ,"type" : "text"
+                        ,"label" : "tell me your name:"
+                    }
+                    ,{
+                        "id" : "cb1"
+                        ,"type" : "checkbox"
+                        ,"label" : "are you sure about the speed of light?"
+                    }
+                 ]
+            }
+        ' )
+    );
+
+## does the project already exist
+
+
+
+## log results to textarea
+
+$output->{'_textarea'} = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
+$output->{'_textarea'} .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
+
+echo json_encode( $output );

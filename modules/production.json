@@ -1,0 +1,25 @@
+{
+    "moduleid"    : "production"
+    ,"label"      : "Production"
+    ,"help"       : "Run production - only possible after minimization"
+    ,"executable" : "production"
+#    ,"resource"   : "docker-local"
+#    ,"dependencies" : [ 
+#        { "base" : "python" }
+#        ,{ "file" : "mass_production.py" }
+# comment above 2 lines and uncomment 2 lines below for perl executable
+#        { "base" : "perl" }
+#        ,{ "cpan" : "JSON" }
+#    ]
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Run production step"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+    ]
+}

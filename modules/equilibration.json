@@ -1,0 +1,25 @@
+{
+    "moduleid"    : "equilibration"
+    ,"label"      : "Equilibration"
+    ,"help"       : "Run equilibration"
+    ,"executable" : "equilibration"
+#    ,"resource"   : "docker-local"
+#    ,"dependencies" : [ 
+#        { "base" : "python" }
+#        ,{ "file" : "mass_equilibration.py" }
+# comment above 2 lines and uncomment 2 lines below for perl executable
+#        { "base" : "perl" }
+#        ,{ "cpan" : "JSON" }
+#    ]
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Run equilibration step"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+    ]
+}
