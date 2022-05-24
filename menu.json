@@ -2,21 +2,22 @@
 {
     "menu" : [
         { 
-            "id"      : "cgrun",
-            "label"   : "Run",
-            "icon"    : "pngs/simulate.png",
-            "modules" : [ 
+            "id"         : "cgrun"
+            ,"label"      : "Run"
+            ,"icon"       : "pngs/simulate.png"
+            ,"startup"   : "true"
+            ,"modules" : [ 
                 { 
-                    "id"    : "load",
-                    "label" : "Load"
+                    "id"    : "load"
+                    ,"label" : "Load"
                 }
                 ,{ 
-                    "id"    : "equilibration",
-                    "label" : "Equilibration"
+                    "id"    : "equilibration"
+                    ,"label" : "Equilibration"
                 }
                 ,{ 
-                    "id"    : "production",
-                    "label" : "Production"
+                    "id"    : "production"
+                    ,"label" : "Production"
                 }
             ]
         }
