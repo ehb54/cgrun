@@ -1,6 +1,22 @@
 #!/usr/local/bin/php
 <?php
 
+### user configuration
+
+#### the namd executable for this
+$namd2          = __DIR__ . "/namd/NAMD_2.14_Linux-x86_64-multicore/namd2";
+
+#### the CHARMM-gui generated base file name ".inp" extension is assumed and not provided here
+$ifile          = "step4_equilibration";
+
+#### this will be replaced by "flavor" details when we go elastic
+$cores          = 4; ### for testing 
+
+####  number seconds between checking the results and updating the UI
+$poll_interval_seconds = 10;
+
+### end user configuration
+
 $self = __FILE__;
 
 if ( count( $argv ) != 2 ) {
@@ -19,11 +35,78 @@ if ( !$input ) {
 
 $output = (object)[];
 
+include "genapp.php";
+
+$genapp = new GenApp( $input, $output );
+
 ## process inputs here to produce output
+
+## is this a proper project that has been "load"'d
+
+if ( !file_exists( "_loaded" ) ) {
+    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for equilibration,<br>Did you <i>load</i> it yet?<br>You can change projects in user configuration (top right)"}}';
+    exit;
+}
+
+## are the expected directories present?
+if ( !is_dir( "charmm-gui/namd" ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"The directory <i>charmm-gui/namd</i> does not exist. You will need to run <i>Load</i> again"}}';
+    exit;
+}
+
+if ( !file_exists( "charmm-gui/namd/$ifile.inp" ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was some removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+
+if ( !file_exists( $namd2 ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"Internal error: <i>' . $namd2 . '</i> does not exist.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+
+## create the command
+
+$cmd = "cd charmm-gui/namd && $namd2 +idlepoll +p$cores $ifile.inp 2> $ifile.stderr > $ifile.stdout";
+
+## ready to run, fork & execute cmd in child
+
+## pcntl_fork(), check /proc/pid to see if still running
+
+$pid = pcntl_fork();
+if ( $pid == -1 ) {
+    echo '{"_message":{"icon":"toast.png","text":"Unable to fork process.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+if ( $pid ) {
+    ## parent
+    while ( file_exists( "/proc/$pid/stat" ) ) {
+        ## is Z/defunct
+        $stat = file_get_contents( "/proc/$pid/stat" );
+        $stat_fields = explode( ' ', $stat );
+        if ( count( $stat_fields ) > 2 && $stat_fields[2] == "Z" ) {
+            break;
+        }
+        ## still running
+        $genapp->udpmessage('{"text":"polling update ' . $pid . '\n"}' );
+        sleep( $poll_interval_seconds );
+    } 
+    pcntl_waitpid( $pid, $status );
+} else {
+    ## child
+    ob_start();
+    $genapp->udpmessage( '{"text":"child starting\n"}' );
+    shell_exec( "sleep 30" );
+    $genapp->udpmessage( '{"text":"child ending\n"}' );
+    ob_end_clean();
+    exit();
+}
 
 ## log results to textarea
 
 $output->{'_textarea'} = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
 $output->{'_textarea'} .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
+$output->{'_textarea'} .= "Command:\n$cmd\n";
+
+$output->_textarea .= "\nEQUILBRATION ok so far...  still in testing mode\n";
 
 echo json_encode( $output );

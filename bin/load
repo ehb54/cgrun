@@ -25,7 +25,7 @@ $genapp = new GenApp( $input, $output );
 
 ## process inputs here to produce output
 
-## does the project already exist
+## does the project already exist ?
 
 if ( file_exists( "_loaded" ) ) {
     $response =
@@ -85,8 +85,25 @@ if ( !is_dir( "charmm-gui/namd" ) ) {
 try {
     file_put_contents( "_loaded", $input->desc . "\n" );
 } catch (Exception $e ) {
-    echo '{"_message":{"icon":"toast.png","text":Error storing load information"}}';
+    echo '{"_message":{"icon":"toast.png","text":"Error storing load information"}}';
     exit;
+}
+
+## save _refpdb info if refpdb present
+if ( isset( $input->refpdb ) ) {
+    try {
+        file_put_contents( "_refpdb", $input->refpdb[0] . "\n" );
+    } catch (Exception $e ) {
+        echo '{"_message":{"icon":"toast.png","text":Error storing reference pdb information"}}';
+        exit;
+    }
+} else {
+    if ( file_exists( "_refpdb" ) ) {
+        if ( false === unlink( "_refpdb" ) ) {
+            echo '{"_message":{"icon":"toast.png","text":"Error removing pre-existing referencd pdb information"}}';
+            exit;
+        }
+    }
 }
 
 ## log results to textarea
@@ -94,5 +111,9 @@ try {
 $output->_textarea = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
 $output->_textarea .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
 $output->_textarea .= $res . "\n";
+
+## final complete message
+
+$output->_textarea .= "\nLOAD COMPLETE\n";
 
 echo json_encode( $output );

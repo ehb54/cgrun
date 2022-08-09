@@ -11,6 +11,7 @@
 #        { "base" : "perl" }
 #        ,{ "cpan" : "JSON" }
 #    ]
+    ,"addproject" : "true"
     ,"fields"   : [
         {
             "role"       : "input"
@@ -28,6 +29,13 @@
             ,"type"             : "lrfile"
             ,"help"             : "This file should be a tar.gz file produced by CHARMM-GUI with Input Generation Options: NAMD checked"
             ,"required"         : "true"
+        }
+        ,{
+            "role"              : "input"
+            ,"id"               : "refpdb"
+            ,"label"            : "Reference PDB"
+            ,"type"             : "lrfile"
+            ,"help"             : "[Optional] The input PDB to CHARMM-gui. If provided, this file will be used to restore chain ids and other information stripped or modified by CHARMM-gui for MD runs"
         }
         ,{
             "role"              : "input"

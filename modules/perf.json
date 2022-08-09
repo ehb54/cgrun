@@ -1,0 +1,40 @@
+{
+    "moduleid" : "perf"
+    ,"label"    : "Performance testing"
+    ,"executable"   : "perf"
+#    ,"submitpolicy" : "login"
+    ,"uniquedir" : "true"
+    ,"resource" : "oscluster"
+    ,"fields"   : [
+        {
+            "role"     : "input",
+            "id"       : "numproc",
+            "label"    : "Number of Processors",
+            "type"     : "integer",
+            "step"     : 24,
+            "min"      : 24,
+            "max"      : 96,
+            "default"  : 24,
+            "required" : "true",
+            "help"     : "help"
+        }
+        ,{
+            "role"     : "input",
+            "id"       : "timeout",
+            "label"    : "Stress timeout in seconds",
+            "type"     : "integer",
+            "step"     : 1,
+            "min"      : 5,
+            "max"      : 600,
+            "default"  : 30,
+            "required" : "true",
+            "help"     : "help"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "note"
+            ,"label"     : "note"
+            ,"type"      : "text"
+        }
+    ]
+}
