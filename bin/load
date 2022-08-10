@@ -71,7 +71,7 @@ if ( strpos( $res, "gzip compressed data" ) === false ) {
     
 ## attempt to extract
 
-$genapp->run_cmd( "[ -d \"charmm-gui\" ] && rm -fr charmm-gui; mkdir charmm-gui && cd charmm-gui && tar zxf $cgfile --strip-components=1", false );
+$genapp->run_cmd( "[ -d \"charmm-gui\" ] && rm -fr charmm-gui; mkdir charmm-gui && cd charmm-gui && tar zxf $cgfile --strip-components=1 && chmod -R g+w .", false );
 
 ## check for expected namd directory
 

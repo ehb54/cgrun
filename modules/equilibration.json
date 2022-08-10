@@ -3,7 +3,7 @@
     ,"label"      : "Equilibration"
     ,"help"       : "Run equilibration"
     ,"executable" : "equilibration"
-#    ,"resource"   : "docker-local"
+    ,"resource"   : "oscluster"
     ,"fields"   : [
         {
             "role"       : "input"
@@ -14,5 +14,26 @@
             ,"prehline"  : "true"
             ,"posthline" : "true"
         }
+        ,{
+            "role"        : "input"
+            ,"id"         : "numproc"
+            ,"label"      : "number of processors"
+            ,"type"       : "integer"
+            ,"default"    : 4
+            ,"hidden"     : "true"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "stdoutlink"
+            ,"label"     : "Live full standard out"
+            ,"type"      : "file"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "energykplot"
+            ,"type"      : "plotly"
+            ,"label"     : " "
+        }
+
     ]
 }

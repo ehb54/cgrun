@@ -1,9 +1,9 @@
 {
-    "moduleid"    : "message"
-    ,"label"      : "Message"
+    "moduleid"    : "messagephp"
+    ,"label"      : "Message php"
     ,"help"       : "help for Message"
-    ,"executable" : "message.py"
-#    ,"resource"   : "oscluster"
+    ,"executable" : "message.php"
+    ,"resource"   : "oscluster"
     ,"dependencies" : [ 
         { "base" : "python" }
 # comment above line and uncomment 2 lines below for python executable
@@ -14,7 +14,7 @@
         {
             "role"       : "input"
             ,"id"        : "module_header"
-            ,"label"     : "Messaging Exercise Python"
+            ,"label"     : "Messaging Exercise PHP"
             ,"type"      : "label"
             ,"default"   : "header4"
             ,"prehline"  : "true"

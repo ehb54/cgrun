@@ -28,7 +28,11 @@
             ,"modules" : [ 
                 { 
                     "id"    : "message"
-                    ,"label" : "messaging"
+                    ,"label" : "messaging python"
+                }
+                ,{ 
+                    "id"    : "messagephp"
+                    ,"label" : "messaging php"
                 }
             ]
         }

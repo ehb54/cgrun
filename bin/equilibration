@@ -9,13 +9,23 @@ $namd2          = __DIR__ . "/namd/NAMD_2.14_Linux-x86_64-multicore/namd2";
 #### the CHARMM-gui generated base file name ".inp" extension is assumed and not provided here
 $ifile          = "step4_equilibration";
 
-#### this will be replaced by "flavor" details when we go elastic
-$cores          = 4; ### for testing 
+####  number seconds between checking to see if the NAMD process is still running
+$poll_interval_seconds = 5;
 
-####  number seconds between checking the results and updating the UI
-$poll_interval_seconds = 10;
+####  frequency of actual UI updates, multiply this by the $poll_interval_seconds to determine actual user update time
+$poll_update_freq      = 1;
 
 ### end user configuration
+
+### developer configuration
+
+$timeout = "";
+#### this will be replaced by "flavor" details when we go elastic
+$cores          = 4; ### for testing 
+#### for debugging
+## $timeout = "timeout 60";
+
+### end developer configuration
 
 $self = __FILE__;
 
@@ -36,8 +46,9 @@ if ( !$input ) {
 $output = (object)[];
 
 include "genapp.php";
+include "datetime.php";
 
-$genapp = new GenApp( $input, $output );
+$ga = new GenApp( $input, $output );
 
 ## process inputs here to produce output
 
@@ -66,37 +77,62 @@ if ( !file_exists( $namd2 ) ) {
 
 ## create the command
 
-$cmd = "cd charmm-gui/namd && $namd2 +idlepoll +p$cores $ifile.inp 2> $ifile.stderr > $ifile.stdout";
-
+$cmd = "cd charmm-gui/namd && $timeout $namd2 +idlepoll +p$cores $ifile.inp 2> $ifile.stderr > $ifile.stdout";
+$ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
 ## ready to run, fork & execute cmd in child
 
 ## pcntl_fork(), check /proc/pid to see if still running
+
+$fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
+if ( file_exists( "charmm-gui/namd/$ifile.stdout" ) ) {
+    unlink( "charmm-gui/namd/$ifile.stdout" );
+}
 
 $pid = pcntl_fork();
 if ( $pid == -1 ) {
     echo '{"_message":{"icon":"toast.png","text":"Unable to fork process.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
     exit;
 }
+
+## prepare to run
+
+
 if ( $pid ) {
     ## parent
+    init_ui();
+    $updatenumber = 0;
     while ( file_exists( "/proc/$pid/stat" ) ) {
-        ## is Z/defunct
+        ## is Z/defunct ?
         $stat = file_get_contents( "/proc/$pid/stat" );
         $stat_fields = explode( ' ', $stat );
         if ( count( $stat_fields ) > 2 && $stat_fields[2] == "Z" ) {
             break;
         }
         ## still running
-        $genapp->udpmessage('{"text":"polling update ' . $pid . '\n"}' );
+        if ( !( $updatenumber++ % $poll_update_freq ) ) {
+            ## update UI
+            # $ga->tcpmessage( [ "_textarea" => "update the UI $updatenumber - $pid\n" ] );
+            update_ui();
+        } else {
+            ## simply checking for job completion
+            $ga->tcpmessage( [ "_textarea" => "polling update $updatenumber - $pid\n" ] );
+        }
         sleep( $poll_interval_seconds );
     } 
+    ## get exit status from /proc/$pid
     pcntl_waitpid( $pid, $status );
 } else {
     ## child
     ob_start();
-    $genapp->udpmessage( '{"text":"child starting\n"}' );
-    shell_exec( "sleep 30" );
-    $genapp->udpmessage( '{"text":"child ending\n"}' );
+    $ga->tcpmessage( [ "_textarea" => "\nEquilibration job starting\n" ] );
+    $ga->tcpmessage( [ "stdoutlink" => "$fdir/charmm-gui/namd/$ifile.stdout" ] );
+    $time_start = dt_now();
+    shell_exec( $cmd );
+    $time_end   = dt_now();
+    $ga->tcpmessage( [ "_textarea" =>
+                       "\nEquilibration job ending\n"
+                       . "NAMD duration: " . dhms_from_minutes( dt_duration_minutes( $time_start, $time_end ) ) . "\n"
+                     ] );
     ob_end_clean();
     exit();
 }
@@ -105,8 +141,99 @@ if ( $pid ) {
 
 $output->{'_textarea'} = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
 $output->{'_textarea'} .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
-$output->{'_textarea'} .= "Command:\n$cmd\n";
+# $output->{'_textarea'} .= "Command:\n$cmd\n";
 
-$output->_textarea .= "\nEQUILBRATION ok so far...  still in testing mode\n";
+# $output->_textarea .= "\nEQUILBRATION ok so far...  still in testing mode\n";
 
 echo json_encode( $output );
+
+## ui bits should really be a class
+
+function init_ui() {
+    global $energykplot;
+    global $ifile;
+    
+    $energykplot = json_decode(
+        '{
+            "data" : [
+                {
+                 "x"     : []
+                 ,"y"    : []
+                 ,"mode" : "lines"
+                 ,"line" : {
+                     "color"  : "rgb(150,150,222)"
+                     ,"width" : 2
+                  }
+                }
+             ]
+             ,"layout" : {
+                "title" : "Energy"
+                ,"font" : {
+                    "color"  : "rgb(0,0,0)"
+                }
+                ,"paper_bgcolor": "rgba(0,0,0,0)"
+                ,"plot_bgcolor": "rgba(0,0,0,0)"
+                ,"xaxis" : {
+                   "gridcolor" : "rgba(50,50,50,0.5)"
+                   ,"title" : {
+                   "text" : "Timestep"
+                    ,"gridcolor" : "rgb(50,50,50)"
+                    ,"font" : {
+                        "color"  : "rgb(50,50,50)"
+                    }
+                 }
+                }
+                ,"yaxis" : {
+                   "gridcolor" : "rgba(50,50,50,0.5)"
+                   ,"title" : {
+                   "text" : "TOTAL3"
+                    ,"font" : {
+                        "color"  : "rgb(50,50,50)"
+                    }
+                 }
+                }
+             }
+        }'
+        );
+
+    $maxx = intval( `grep -Pi '^minimize' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
+    if ( $maxx > 0 ) {
+        $energykplot->layout->xaxis->range = [0, $maxx ];
+    }
+}
+
+function update_ui() {
+    global $ga;
+    global $ifile;
+    global $energykplot;
+
+    # $ga->tcpmessage( [ "_textarea" => "update_ui()\n" ] );
+
+    $cmd = "grep -P '^ENERGY:' charmm-gui/namd/$ifile.stdout 2> /dev/null";
+    $allE = `$cmd`;
+    $Es = explode( "\n", $allE );
+    if ( count( $Es ) < 2 ) {
+        return;
+    }
+
+    array_pop( $Es ); ## last one appears to be empty
+        
+    # $ga->tcpmessage( [ "_textarea" => end( $Es ) . "\n" ] );
+    
+    ## create plotly plot
+
+    $energykplot->data[0]->x = [];
+    $energykplot->data[0]->y = [];
+
+    foreach ( $Es as $v ) {
+        $l = preg_split( "/\s+/", $v );
+        if ( count( $l ) > 14 ) {
+            $energykplot->data[0]->x[] = $l[1];
+            $energykplot->data[0]->y[] = $l[14];
+            # $ga->tcpmessage( [ "_textarea" => "data $l[1] $l[14]\n" ] );
+        }
+    }
+        
+    # $ga->tcpmessage( [ "_textarea" => json_encode( $energykplot, JSON_PRETTY_PRINT ) . "\n" ] );
+    $ga->tcpmessage( [ "energykplot" => $energykplot ] );
+}
