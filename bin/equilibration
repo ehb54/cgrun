@@ -20,8 +20,7 @@ $poll_update_freq      = 1;
 ### developer configuration
 
 $timeout = "";
-#### this will be replaced by "flavor" details when we go elastic
-$cores          = 4; ### for testing 
+
 #### for debugging
 ## $timeout = "timeout 60";
 
@@ -52,6 +51,36 @@ $ga = new GenApp( $input, $output );
 
 ## process inputs here to produce output
 
+if ( !isset( $input->os_flavor ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"Internal error: <i>os_flavor</i> not defined.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+
+if ( !file_exists( __DIR__ . "/../appconfig.json" ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"Internal error: <i>appconfig.json</i> not found.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+
+$appconfig = json_decode( file_get_contents(  __DIR__ . "/../appconfig.json" ) );
+if ( !isset( $appconfig->resources )
+     || !isset( $appconfig->resources->oscluster )
+     || !isset( $appconfig->resources->oscluster->properties )
+     || !isset( $appconfig->resources->oscluster->properties->flavors ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"Internal error: <i>appconfig.json</i> missing <i>resources:oscluster:properties:flavors</i>.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+
+if ( !array_key_exists( str_replace( "_", ".", $input->os_flavor ), $appconfig->resources->oscluster->properties->flavors ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"Internal error: flavor <i>' . str_replace( "_", ".", $input->os_flavor ) . '</i> missing resources:oscluster:properties:flavors.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+
+$cores = $appconfig->resources->oscluster->properties->flavors->{ str_replace( "_", ".", $input->os_flavor ) };
+
+# $ga->tcpmessage( [ "_textarea" => json_encode( $appconfig->resources->oscluster->properties->flavors, JSON_PRETTY_PRINT ) . "\n" ] );
+
+### read appconfig.json & get flavor mapping to determine # of cores
+
 ## is this a proper project that has been "load"'d
 
 if ( !file_exists( "_loaded" ) ) {
@@ -66,7 +95,15 @@ if ( !is_dir( "charmm-gui/namd" ) ) {
 }
 
 if ( !file_exists( "charmm-gui/namd/$ifile.inp" ) ) {
-    echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was some removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+    echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+
+## validate $ifile.inp
+if ( count( explode( "\n", `grep -Pi '^minimize ' charmm-gui/namd/$ifile.inp` ) ) != 2
+     || count( explode( "\n", `grep -Pi '^run ' charmm-gui/namd/$ifile.inp` ) ) != 2
+    ) {
+    echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> does not contain exactly one <i>minimize</i> line and exactly one <i>run<i> line.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was somehow modified after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
     exit;
 }
 
@@ -81,12 +118,14 @@ $cmd = "cd charmm-gui/namd && $timeout $namd2 +idlepoll +p$cores $ifile.inp 2> $
 $ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
 ## ready to run, fork & execute cmd in child
 
-## pcntl_fork(), check /proc/pid to see if still running
 
 $fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
 if ( file_exists( "charmm-gui/namd/$ifile.stdout" ) ) {
     unlink( "charmm-gui/namd/$ifile.stdout" );
 }
+$ga->tcpmessage( [ "inputlink" => "$fdir/charmm-gui/namd/$ifile.inp" ] );
+
+## fork ... child will exec
 
 $pid = pcntl_fork();
 if ( $pid == -1 ) {
@@ -121,6 +160,7 @@ if ( $pid ) {
     } 
     ## get exit status from /proc/$pid
     pcntl_waitpid( $pid, $status );
+    update_ui();
 } else {
     ## child
     ob_start();
@@ -139,21 +179,32 @@ if ( $pid ) {
 
 ## log results to textarea
 
-$output->{'_textarea'} = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
-$output->{'_textarea'} .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
-# $output->{'_textarea'} .= "Command:\n$cmd\n";
+update_ui( false );
 
-# $output->_textarea .= "\nEQUILBRATION ok so far...  still in testing mode\n";
+$output->min_e_plot = $namd->min_e_plot;
+$output->run_e_plot = $namd->run_e_plot;
+$output->run_t_plot = $namd->run_t_plot;
+
+$output->_textarea = "";
+
+#$output->_textarea .= "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
+$output->_textarea .= "JSON input to executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
+# $output->_textarea .= "Command:\n$cmd\n";
+
+$output->_textarea .= "\nEQUILBRATION complete\n";
 
 echo json_encode( $output );
 
 ## ui bits should really be a class
 
 function init_ui() {
-    global $energykplot;
     global $ifile;
+    global $namd;
+    global $ga;
+
+    $namd = (object)[];
     
-    $energykplot = json_decode(
+    $namd->min_e_plot = json_decode(
         '{
             "data" : [
                 {
@@ -167,7 +218,8 @@ function init_ui() {
                 }
              ]
              ,"layout" : {
-                "title" : "Energy"
+                "title" : "Minimize TOTAL3"
+                ,"showlegend" : false
                 ,"font" : {
                     "color"  : "rgb(0,0,0)"
                 }
@@ -196,16 +248,49 @@ function init_ui() {
         }'
         );
 
-    $maxx = intval( `grep -Pi '^minimize' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
-    if ( $maxx > 0 ) {
-        $energykplot->layout->xaxis->range = [0, $maxx ];
+    $namd->run_e_plot  = json_decode( json_encode( $namd->min_e_plot ) );
+    $namd->run_e_plot->layout->title = "Run TOTAL3";
+
+    $namd->run_t_plot  = json_decode( json_encode( $namd->min_e_plot ) );
+    $namd->run_t_plot->layout->title              = "Run Temperature";
+    $namd->run_t_plot->layout->yaxis->title->text = "Temperature";
+
+    $namd->min_steps   = intval( `grep -Pi '^minimize ' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
+    $namd->run_steps   = intval( `grep -Pi '^run ' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
+    $namd->temperature = intval( `grep -Pi '^set temp ' charmm-gui/namd/$ifile.inp  | awk '{ print \$3 }'` );
+
+    if ( $namd->min_steps > 0 ) {
+        $namd->min_e_plot->layout->xaxis->range = [0, $namd->min_steps ];
     }
+        
+    if ( $namd->run_steps > 0 ) {
+        $namd->run_e_plot->layout->xaxis->range = [$namd->min_steps, $namd->min_steps + $namd->run_steps ];
+        $namd->run_t_plot->layout->xaxis->range = [$namd->min_steps, $namd->min_steps + $namd->run_steps ];
+        if ( $namd->temperature > 0 ) {
+            $namd->run_t_plot->data[] =
+                [
+                 "x" => [ $namd->min_steps, $namd->min_steps + $namd->run_steps ]
+                 ,"y" => [ $namd->temperature, $namd->temperature ]
+                 ,"mode" => "lines"
+                 ,"line" => [
+                     "color"  => "rgba(222,0,0,0.5)"
+                     ,"dash"  => "dashdot"
+                     ,"width" => 2
+                 ]
+                ]
+                ;
+        }
+    }
+
+    # $ga->tcpmessage( [ "_textarea" => "temperature: $namd->temperature\n" . json_encode( $namd->run_t_plot, JSON_PRETTY_PRINT ) . "\n" ] );
+
+    $namd->min_plot_done = false;
 }
 
-function update_ui() {
+function update_ui( $message = true ) {
     global $ga;
     global $ifile;
-    global $energykplot;
+    global $namd;
 
     # $ga->tcpmessage( [ "_textarea" => "update_ui()\n" ] );
 
@@ -222,18 +307,51 @@ function update_ui() {
     
     ## create plotly plot
 
-    $energykplot->data[0]->x = [];
-    $energykplot->data[0]->y = [];
+    $namd->min_e_plot->data[0]->x = [];
+    $namd->min_e_plot->data[0]->y = [];
+    $namd->run_e_plot->data[0]->x = [];
+    $namd->run_e_plot->data[0]->y = [];
+    $namd->run_t_plot->data[0]->x = [];
+    $namd->run_t_plot->data[0]->y = [];
+
+    $min_done = $namd->min_plot_done;
+    
+    $lastt = 0;
 
     foreach ( $Es as $v ) {
         $l = preg_split( "/\s+/", $v );
         if ( count( $l ) > 14 ) {
-            $energykplot->data[0]->x[] = $l[1];
-            $energykplot->data[0]->y[] = $l[14];
+            $lastt = intval( $l[1] );
+            if ( intval( $l[1] ) < $namd->min_steps ) {
+                $namd->min_e_plot->data[0]->x[] = $l[1];
+                $namd->min_e_plot->data[0]->y[] = $l[14];
+            } else {
+                $min_done = true;
+                $namd->run_e_plot->data[0]->x[] = $l[1];
+                $namd->run_e_plot->data[0]->y[] = $l[14];
+                $namd->run_t_plot->data[0]->x[] = $l[1];
+                $namd->run_t_plot->data[0]->y[] = $l[12];
+            }
+                
             # $ga->tcpmessage( [ "_textarea" => "data $l[1] $l[14]\n" ] );
         }
     }
         
-    # $ga->tcpmessage( [ "_textarea" => json_encode( $energykplot, JSON_PRETTY_PRINT ) . "\n" ] );
-    $ga->tcpmessage( [ "energykplot" => $energykplot ] );
+    # $ga->tcpmessage( [ "_textarea" => json_encode( $min_e_plot, JSON_PRETTY_PRINT ) . "\n" ] );
+    if ( $message ) {
+        if ( !$namd->min_plot_done ) {
+            $ga->tcpmessage( [
+                                 "min_e_plot" => $namd->min_e_plot
+                                 ,"_progress" => $lastt / ( $namd->min_steps + $namd->run_steps )
+                             ] );
+        }
+        $namd->min_plot_done = $min_done;
+        if ( $min_done ) {
+            $ga->tcpmessage( [
+                                 "run_e_plot" => $namd->run_e_plot
+                                 ,"run_t_plot" => $namd->run_t_plot
+                                 ,"_progress" => $lastt / ( $namd->min_steps + $namd->run_steps )
+                             ] );
+        }
+    }
 }

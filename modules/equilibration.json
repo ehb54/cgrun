@@ -15,22 +15,43 @@
             ,"posthline" : "true"
         }
         ,{
-            "role"        : "input"
-            ,"id"         : "numproc"
-            ,"label"      : "number of processors"
-            ,"type"       : "integer"
-            ,"default"    : 4
-            ,"hidden"     : "true"
+            "role"       : "input"
+            ,"id"        : "os_flavor"
+            ,"label"     : "Processor cores"
+            ,"type"      : "listbox"
+            ,"values"    : "2~m3_small~4~m3_quad~8~m3_medium~16~m3_large~32~m3_xl~64~m3_2xl"
+            ,"default"   : "m3_large"
+            ,"help"      : "Select the number of cores to use.<br>More cores will generally run faster (up to a point).<br>Too many cores will over-consume your allocation.<br>Memory limits increase with increasing number of cores."
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "inputlink"
+            ,"label"     : "NAMD input"
+            ,"type"      : "file"
+            ,"help"      : "Produced by CHARMM-gui (unless it was manually modified). Right click to download"
         }
         ,{
             "role"       : "output"
             ,"id"        : "stdoutlink"
-            ,"label"     : "Live full standard out"
+            ,"label"     : "NAMD output"
             ,"type"      : "file"
+            ,"help"      : "Live output during run. Right click to download"
         }
         ,{
             "role"       : "output"
-            ,"id"        : "energykplot"
+            ,"id"        : "run_e_plot"
+            ,"type"      : "plotly"
+            ,"label"     : " "
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "run_t_plot"
+            ,"type"      : "plotly"
+            ,"label"     : " "
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "min_e_plot"
             ,"type"      : "plotly"
             ,"label"     : " "
         }
