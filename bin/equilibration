@@ -181,6 +181,8 @@ if ( $pid ) {
 
 update_ui( false );
 
+$output->inputlink  = "$fdir/charmm-gui/namd/$ifile.inp";
+$output->stdoutlink = "$fdir/charmm-gui/namd/$ifile.stdout";
 $output->min_e_plot = $namd->min_e_plot;
 $output->run_e_plot = $namd->run_e_plot;
 $output->run_t_plot = $namd->run_t_plot;
