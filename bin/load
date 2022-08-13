@@ -36,7 +36,7 @@ if ( file_exists( "_loaded" ) ) {
                  ,"title"       => "<h5>Project '$input->_project' is not empty</h5>"
                  ,"icon"        => "warning.png"
                  ,"text"        => ""
-                 ,"timeouttext" => "The time to respond has expired, please search again."
+                 ,"timeouttext" => "The time to respond has expired, please submit again."
                  ,"buttons"     => [ "Erase previous results", "Cancel" ]
                  ,"fields" => [
                      [
@@ -50,7 +50,6 @@ if ( file_exists( "_loaded" ) ) {
 
             )
         );
-
     
     if ( $response->_response->button == "cancel" ) {
         echo '{"_message":{"icon":"information.png","text":"Canceled"}}';

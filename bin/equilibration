@@ -48,6 +48,42 @@ include "genapp.php";
 include "datetime.php";
 
 $ga = new GenApp( $input, $output );
+$fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
+
+## check for previous run
+
+#### would be nice to do this before openstack :(
+#### another case for early defaults?
+
+if ( file_exists(  "charmm-gui/namd/$ifile.dcd" ) ) {
+    $response =
+        json_decode(
+            $ga->tcpquestion(
+                [
+                 "id"           => "q1"
+                 ,"title"       => "<h5>Project '$input->_project' has previous equilibration results</h5>"
+                 ,"icon"        => "warning.png"
+                 ,"text"        => ""
+                 ,"timeouttext" => "The time to respond has expired, please submit again."
+                 ,"buttons"     => [ "Erase previous results", "Cancel" ]
+                 ,"fields" => [
+                     [
+                      "id"          => "l1"
+                      ,"type"       => "label"
+                      ,"label"      => "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Previous results will be overwritten!"
+                      ,"align"      => "center"
+                     ]
+                 ]
+                ]
+
+            )
+        );
+
+    if ( $response->_response->button == "cancel" ) {
+        echo '{"_message":{"icon":"information.png","text":"Canceled"}}';
+        exit;
+    }
+}
 
 ## process inputs here to produce output
 
@@ -118,11 +154,14 @@ $cmd = "cd charmm-gui/namd && $timeout $namd2 +idlepoll +p$cores $ifile.inp 2> $
 $ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
 ## ready to run, fork & execute cmd in child
 
+$deletes = [ ".stdout", ".dcd", "_last.dcd", "_last.pdb", "_last_dry.pdb", "_results.tgz" ];
 
-$fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
-if ( file_exists( "charmm-gui/namd/$ifile.stdout" ) ) {
-    unlink( "charmm-gui/namd/$ifile.stdout" );
+foreach ( $deletes as $v ) {
+    if ( file_exists( "charmm-gui/namd/$ifile$v" ) ) {
+        unlink( "charmm-gui/namd/$ifile$v" );
+    }
 }
+
 $ga->tcpmessage( [ "inputlink" => "$fdir/charmm-gui/namd/$ifile.inp" ] );
 
 ## fork ... child will exec
@@ -134,7 +173,6 @@ if ( $pid == -1 ) {
 }
 
 ## prepare to run
-
 
 if ( $pid ) {
     ## parent
@@ -154,7 +192,7 @@ if ( $pid ) {
             update_ui();
         } else {
             ## simply checking for job completion
-            $ga->tcpmessage( [ "_textarea" => "polling update $updatenumber - $pid\n" ] );
+            # $ga->tcpmessage( [ "_textarea" => "polling update $updatenumber - $pid\n" ] );
         }
         sleep( $poll_interval_seconds );
     } 
@@ -177,12 +215,70 @@ if ( $pid ) {
     exit();
 }
 
-## log results to textarea
+## assemble final output
 
+## dcd->pdb
+
+if ( file_exists( "charmm-gui/namd/$ifile.dcd" ) ) {
+    $cmd = "cd charmm-gui/namd && " . __DIR__ . "/util/catdcd -num $ifile.dcd | grep -P '^Total frames' | awk '{ print \$3 }'";
+    $lframe = intval( `$cmd 2>/dev/null` );
+    if ( $lframe > 1 ) {
+        # $ga->tcpmessage( [ "_textarea" => "checking for dcd to make pdb - lframe > 1\n" ] );
+        ## need 2 frames for mdconvert
+        $lframe--;
+        $cmd = "cd charmm-gui/namd && " . __DIR__ . "/util/catdcd  -first $lframe -o ${ifile}_last.dcd $ifile.dcd";
+        `$cmd 2>&1 > /dev/null`;
+        if ( file_exists( "charmm-gui/namd/${ifile}_last.dcd" ) ) {
+            $cmd = "cd charmm-gui/namd && mdconvert -f -o ${ifile}_last.pdb -t step3_input.pdb -i -1 ${ifile}_last.dcd";
+            `$cmd 2>&1 > /dev/null`;
+            if ( file_exists( "charmm-gui/namd/${ifile}_last.pdb" ) ) {
+                $cmd = "cd charmm-gui/namd && grep -Pv ' (HOH|POT POT|SOD  SOD|CLA  CLA) ' ${ifile}_last.pdb > ${ifile}_last_dry.pdb";
+                #$ga->tcpmessage( [ "_textarea" => "nowat cmd $cmd\n" ] );
+                `$cmd 2> /dev/null`;
+                if ( file_exists( "charmm-gui/namd/${ifile}_last_dry.pdb" ) ) {
+                    $output->pdblastdry = "$fdir/charmm-gui/namd/${ifile}_last_dry.pdb";
+                } else {
+                    $ga->tcpmessage( [ "_textarea" => "Notice: failed to extract solvent from pdb, so no pdb will be created for visulization\n" ] );
+                }
+            } else {
+                $ga->tcpmessage( [ "_textarea" => "Notice: mdconvert failed to create a pdb from the dcd, so no pdb will be created for visulization\n" ] );
+            }
+        } else {
+            $ga->tcpmessage( [ "_textarea" => "Notice: catdcd failed to extract frames from the dcd, so no pdb will be created for visulization\n" ] );
+        }
+    } else {
+        $ga->tcpmessage( [ "_textarea" => "Notice: final dcd has only one frame, so no pdb will be created for visulization\n" ] );
+    }
+} else {
+    $ga->tcpmessage( [ "_textarea" => "Notice: No final dcd file found so no pdb will be created for visulization\n" ] );
+}    
+
+## tar gz output
+
+$tgzfiles = [
+    "$ifile.vel"
+    ,"$ifile.coor"
+    ,"$ifile.xsc"
+    ,"$ifile.xst"
+    ,"$ifile.stdout"
+    ,"$ifile.stderr"
+    ,"${ifile}_last.pdb"
+    ,"${ifile}_last_dry.pdb"
+    ,"xyz.not.there"
+    ];
+
+$cmd = "cd charmm-gui/namd && ls -1 " . implode( " ", $tgzfiles ) . " 2> /dev/null";
+exec( $cmd, $tgzfilesfound );
+$cmd = "cd charmm-gui/namd && tar -I pigz -cf ${ifile}_results.tgz " . implode( " ", $tgzfilesfound );
+`$cmd 2>&1 > /dev/null`;
+
+    
 update_ui( false );
 
 $output->inputlink  = "$fdir/charmm-gui/namd/$ifile.inp";
+$output->dcdlink    = "$fdir/charmm-gui/namd/$ifile.dcd";
 $output->stdoutlink = "$fdir/charmm-gui/namd/$ifile.stdout";
+$output->tgzlink    = "$fdir/charmm-gui/namd/${ifile}_results.tgz";
 $output->min_e_plot = $namd->min_e_plot;
 $output->run_e_plot = $namd->run_e_plot;
 $output->run_t_plot = $namd->run_t_plot;

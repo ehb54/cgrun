@@ -3,7 +3,7 @@
     ,"label"      : "Equilibration"
     ,"help"       : "Run equilibration"
     ,"executable" : "equilibration"
-    ,"resource"   : "oscluster"
+#    ,"resource"   : "oscluster"
     ,"fields"   : [
         {
             "role"       : "input"
@@ -20,7 +20,9 @@
             ,"label"     : "Processor cores"
             ,"type"      : "listbox"
             ,"values"    : "2~m3_small~4~m3_quad~8~m3_medium~16~m3_large~32~m3_xl~64~m3_2xl"
+#            ,"values"    : "2~m3_small~4~m3_quad~8~m3_medium~16~m3_large~32~m3_xl~64~m3_2xl~128~m3_3xl"
             ,"default"   : "m3_large"
+#            ,"default"   : "m3_quad"
             ,"help"      : "Select the number of cores to use.<br>More cores will generally run faster (up to a point, after which it may run slower).<br>Too many cores will over-consume your allocation.<br>Memory limits increase with increasing number of cores."
         }
         ,{
@@ -36,6 +38,29 @@
             ,"label"     : "NAMD output"
             ,"type"      : "file"
             ,"help"      : "Live output during run. Right click to download"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "dcdlink"
+            ,"label"     : "DCD"
+            ,"type"      : "file"
+            ,"help"      : "Final DCD"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "tgzlink"
+            ,"label"     : "Archive of produced files"
+            ,"type"      : "file"
+            ,"help"      : "tar.gz format. Does not include DCD which is already compressed"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "pdblastdry"
+            ,"type"      : "atomicstructure"
+            ,"label"     : "Last frame structure"
+            ,"help"      : "No waters or ions included, Right click on structure for JSmol controls"
+            ,"width"     : "100%"
+            ,"jsmoladd"  : "ribbon only; color structure"
         }
         ,{
             "role"       : "output"
@@ -55,6 +80,5 @@
             ,"type"      : "plotly"
             ,"label"     : " "
         }
-
     ]
 }
