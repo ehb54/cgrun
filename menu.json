@@ -27,6 +27,10 @@
             ,"icon"       : "pngs/simulate.png"
             ,"modules" : [ 
                 { 
+                    "id"    : "loaddefaults"
+                    ,"label" : "loaddefaults"
+                }
+                ,{ 
                     "id"    : "message"
                     ,"label" : "messaging python"
                 }

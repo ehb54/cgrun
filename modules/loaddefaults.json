@@ -1,0 +1,39 @@
+{
+    "moduleid"    : "loaddefaults"
+    ,"label"      : "Test load defaults"
+    ,"help"       : "help for test load defaults"
+    ,"executable" : "loaddefaults.php"
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Test load defaults"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+        ,{
+            "role"        : "input"
+            ,"id"         : "textfield"
+            ,"label"      : "Text field"
+            ,"type"       : "text"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "getdefaults"
+            ,"label"       : "Get defaults"
+            ,"type"        : "button"
+            ,"buttontext"  : "Get defaults"
+#            ,"buttonstyle" : "select"
+            ,"hook"        : "getdefaults.php"
+            ,"file"        : "lfile"
+        }
+        ,{
+            "role"        : "output"
+            ,"id"         : "result"
+            ,"label"      : "Result"
+            ,"type"       : "text"
+        }
+    ]
+}
