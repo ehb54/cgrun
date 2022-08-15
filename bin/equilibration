@@ -198,6 +198,11 @@ if ( $pid ) {
     } 
     ## get exit status from /proc/$pid
     pcntl_waitpid( $pid, $status );
+    ## namd returns status zero even if it fails :(
+    ## $ga->tcpmessage( [ "_textarea" => sprintf( "exit status %s\n", pcntl_wexitstatus( $status ) ) ] );
+    if ( file_exists( "charmm-gui/namd/${ifile}.stderr" ) && filesize( "charmm-gui/namd/${ifile}.stderr" ) ) {
+        $ga->tcpmessage( [ "_textarea" => "NAMD errors:\n" . file_get_contents( "charmm-gui/namd/${ifile}.stderr" ) . "\n" ] );
+    }
     update_ui();
 } else {
     ## child
@@ -276,9 +281,13 @@ $cmd = "cd charmm-gui/namd && tar -I pigz -cf ${ifile}_results.tgz " . implode( 
 update_ui( false );
 
 $output->inputlink  = "$fdir/charmm-gui/namd/$ifile.inp";
-$output->dcdlink    = "$fdir/charmm-gui/namd/$ifile.dcd";
+if ( file_exists( "charmm-gui/namd/$ifile.dcd" ) ) {
+    $output->dcdlink    = "$fdir/charmm-gui/namd/$ifile.dcd";
+}
 $output->stdoutlink = "$fdir/charmm-gui/namd/$ifile.stdout";
-$output->tgzlink    = "$fdir/charmm-gui/namd/${ifile}_results.tgz";
+if ( file_exists( "charmm-gui/namd/${ifile}_results.tgz" ) ) {
+    $output->tgzlink    = "$fdir/charmm-gui/namd/${ifile}_results.tgz";
+}
 $output->min_e_plot = $namd->min_e_plot;
 $output->run_e_plot = $namd->run_e_plot;
 $output->run_t_plot = $namd->run_t_plot;
