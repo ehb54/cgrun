@@ -26,7 +26,7 @@
             ,"type"        : "button"
             ,"buttontext"  : "Get defaults"
 #            ,"buttonstyle" : "select"
-            ,"hook"        : "getdefaults.php"
+            ,"hook"        : "load_defaults.php"
             ,"file"        : "lfile"
         }
         ,{
