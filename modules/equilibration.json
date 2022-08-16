@@ -26,6 +26,42 @@
             ,"help"      : "Select the number of cores to use.<br>More cores will generally run faster (up to a point, after which it may run slower).<br>Too many cores will over-consume your allocation.<br>Memory limits increase with increasing number of cores."
         }
         ,{
+            "role"         : "input"
+            ,"id"          : "sparams"
+            ,"label"       : "Simulation parameters"
+            ,"type"        : "checkbox"
+            ,"repeater"    : "true"
+            ,"hook"        : "equilibration_defaults.php"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "temperature"
+            ,"label"       : "Temperature"
+            ,"type"        : "float"
+            ,"repeat"      : "sparams"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "min_steps"
+            ,"label"       : "Minimization steps"
+            ,"type"        : "integer"
+            ,"repeat"      : "sparams"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "run_steps"
+            ,"label"       : "Run steps"
+            ,"type"        : "integer"
+            ,"repeat"      : "sparams"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "dcdfreq"
+            ,"label"       : "DCD output frequency"
+            ,"type"        : "integer"
+            ,"repeat"      : "sparams"
+        }
+        ,{
             "role"       : "output"
             ,"id"        : "inputlink"
             ,"label"     : "NAMD input"

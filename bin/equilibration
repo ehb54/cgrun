@@ -143,10 +143,42 @@ if ( count( explode( "\n", `grep -Pi '^minimize ' charmm-gui/namd/$ifile.inp` ) 
     exit;
 }
 
+## update $ifile.inp if needed
+if (
+    isset( $input->min_steps )
+    || isset( $input->run_steps )
+    || isset( $input->dcdfreq )
+    || isset( $input->temperature )
+    ) {
+    $inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ifile.inp" ) );
+    $inpnew = preg_replace(
+        [
+         '/^set temp\s*(\d+)/'
+         ,'/^dcdfreq(\s*)(\d+)/'
+         ,'/^minimize(\s*)(\d+)/'
+         ,'/^run(\s*)(\d+)/'
+        ],
+        [
+         "set temp                $input->temperature"
+         ,"dcdfreq                 $input->dcdfreq"
+         ,"minimize                $input->min_steps"
+         ,"run                     $input->run_steps"
+        ]
+        ,$inplines
+        );
+    if ( count( $inplines ) != count( $inpnew ) ) {
+        echo '{"_message":{"icon":"toast.png","text":"Error replacing values in input script<br>Try <i>load</i> again.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+        exit;
+    }
+    file_put_contents( "charmm-gui/namd/$ifile.inp", implode( "\n", $inpnew ) );
+}
+
 if ( !file_exists( $namd2 ) ) {
     echo '{"_message":{"icon":"toast.png","text":"Internal error: <i>' . $namd2 . '</i> does not exist.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
     exit;
 }
+
+
 
 ## create the command
 
@@ -370,7 +402,7 @@ function init_ui() {
 
     $namd->min_steps   = intval( `grep -Pi '^minimize ' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
     $namd->run_steps   = intval( `grep -Pi '^run ' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
-    $namd->temperature = intval( `grep -Pi '^set temp ' charmm-gui/namd/$ifile.inp  | awk '{ print \$3 }'` );
+    $namd->temperature = floatval( `grep -Pi '^set temp ' charmm-gui/namd/$ifile.inp  | awk '{ print \$3 }'` );
 
     if ( $namd->min_steps > 0 ) {
         $namd->min_e_plot->layout->xaxis->range = [0, $namd->min_steps ];
