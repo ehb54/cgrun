@@ -119,8 +119,8 @@ $cores = $appconfig->resources->oscluster->properties->flavors->{ str_replace( "
 
 ## is this a proper project that has been "load"'d
 
-if ( !file_exists( "_loaded" ) ) {
-    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for production,<br>Did you <i>load</i> it yet?<br>You can change projects in user configuration (top right)"}}';
+if ( !file_exists( "charmm-gui/namd/step4_equilibration.dcd" ) ) {
+    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for production,<br>Did you run <i>equilibration</i> yet?<br>You can change projects in user configuration (top right)"}}';
     exit;
 }
 
@@ -137,8 +137,6 @@ if ( !file_exists( "charmm-gui/namd/$ifile.inp" ) ) {
 
 ## validate $ifile.inp
 
-### *** REDO for production
-
 if ( count( explode( "\n", `grep -Pi '^numsteps ' charmm-gui/namd/$ifile.inp` ) ) != 2
      || count( explode( "\n", `grep -Pi '^run ' charmm-gui/namd/$ifile.inp` ) ) != 2
     ) {
@@ -147,9 +145,8 @@ if ( count( explode( "\n", `grep -Pi '^numsteps ' charmm-gui/namd/$ifile.inp` ) 
 }
 
 ## update $ifile.inp if needed
-### *** REDO for production
 if (
-    isset( $input->min_steps )
+    isset( $input->numsteps )
     || isset( $input->run_steps )
     || isset( $input->dcdfreq )
     || isset( $input->temperature )
@@ -177,6 +174,26 @@ if (
     file_put_contents( "charmm-gui/namd/$ifile.inp", implode( "\n", $inpnew ) );
 }
 
+## verfiy and add additional parameters to .inp for namd3 GPU
+$addcuda = [
+    'CUDASOAintegrate' => 'CUDASOAintegrate        on;'
+    ,'margin'          => 'margin                  4;'
+    ];
+$inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ifile.inp" ) );
+$inpnew   = $inplines;
+foreach ( $addcuda as $k => $v ) {
+    $inpnew = preg_replace( "/^$k .*\$/i", $v, $inpnew, -1, $rplc_count );
+    if ( $rplc_count == 0 ) {
+        array_unshift( $inpnew, $v );
+    }
+}
+if ( $inplines != $inpnew ) {
+    file_put_contents( "charmm-gui/namd/$ifile.inp", implode( "\n", $inpnew ) );
+    $ga->tcpmessage( [ "_textarea" => "Updated $ifile.inp to add " . implode( " ", array_keys( $addcuda ) ) . "\n" ] );
+}    
+
+## final check existence
+
 if ( !file_exists( $namd3 ) ) {
     echo '{"_message":{"icon":"toast.png","text":"Internal error: <i>' . $namd3 . '</i> does not exist.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab"}}';
     exit;
@@ -184,14 +201,10 @@ if ( !file_exists( $namd3 ) ) {
 
 ## create the command
 
-$cmd = "cd charmm-gui/namd && $timeout $namd3 +idlepoll +p1 -devices 0 $ifile.inp 2> $ifile.stderr > $ifile.stdout";
+$cmd = "cd charmm-gui/namd && $timeout $namd3 +idlepoll +p1 +devices 0 $ifile.inp 2> $ifile.stderr > $ifile.stdout";
 $ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
-## ready to run, fork & execute cmd in child
-## exit early
-echo '{"_message":{"icon":"toast.png","text":"Testing..."}}';
-exit();
 
-### *** REDO for production from here out
+## ready to run, fork & execute cmd in child
 
 $deletes = [ ".stdout", ".dcd", "_last.dcd", "_last.pdb", "_last_dry.pdb", "_results.tgz" ];
 
@@ -311,7 +324,6 @@ $tgzfiles = [
     ,"$ifile.stderr"
     ,"${ifile}_last.pdb"
     ,"${ifile}_last_dry.pdb"
-    ,"xyz.not.there"
     ];
 
 $cmd = "cd charmm-gui/namd && ls -1 " . implode( " ", $tgzfiles ) . " 2> /dev/null";
@@ -332,7 +344,6 @@ if ( file_exists( "charmm-gui/namd/${ifile}_results.tgz" ) ) {
 }
 
 if ( file_exists( "charmm-gui/namd/$ifile.stdout" ) && filesize( "charmm-gui/namd/$ifile.stdout" ) > 0 ) {
-    $output->min_e_plot = $namd->min_e_plot;
     $output->run_e_plot = $namd->run_e_plot;
     $output->run_t_plot = $namd->run_t_plot;
 }
@@ -356,7 +367,7 @@ function init_ui() {
 
     $namd = (object)[];
     
-    $namd->min_e_plot = json_decode(
+    $namd->run_e_plot = json_decode(
         '{
             "data" : [
                 {
@@ -370,7 +381,7 @@ function init_ui() {
                 }
              ]
              ,"layout" : {
-                "title" : "Minimize TOTAL3"
+                "title" : "Run TOTAL3"
                 ,"showlegend" : false
                 ,"font" : {
                     "color"  : "rgb(0,0,0)"
@@ -400,28 +411,20 @@ function init_ui() {
         }'
         );
 
-    $namd->run_e_plot  = json_decode( json_encode( $namd->min_e_plot ) );
-    $namd->run_e_plot->layout->title = "Run TOTAL3";
-
-    $namd->run_t_plot  = json_decode( json_encode( $namd->min_e_plot ) );
+    $namd->run_t_plot  = json_decode( json_encode( $namd->run_e_plot ) );
     $namd->run_t_plot->layout->title              = "Run Temperature";
     $namd->run_t_plot->layout->yaxis->title->text = "Temperature";
 
-    $namd->min_steps   = intval( `grep -Pi '^minimize ' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
     $namd->run_steps   = intval( `grep -Pi '^run ' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
     $namd->temperature = floatval( `grep -Pi '^set temp ' charmm-gui/namd/$ifile.inp  | awk '{ print \$3 }'` );
 
-    if ( $namd->min_steps > 0 ) {
-        $namd->min_e_plot->layout->xaxis->range = [0, $namd->min_steps ];
-    }
-        
     if ( $namd->run_steps > 0 ) {
-        $namd->run_e_plot->layout->xaxis->range = [$namd->min_steps, $namd->min_steps + $namd->run_steps ];
-        $namd->run_t_plot->layout->xaxis->range = [$namd->min_steps, $namd->min_steps + $namd->run_steps ];
+        $namd->run_e_plot->layout->xaxis->range = [0, $namd->run_steps ];
+        $namd->run_t_plot->layout->xaxis->range = [0, $namd->run_steps ];
         if ( $namd->temperature > 0 ) {
             $namd->run_t_plot->data[] =
                 [
-                 "x" => [ $namd->min_steps, $namd->min_steps + $namd->run_steps ]
+                 "x" => [ 0, $namd->run_steps ]
                  ,"y" => [ $namd->temperature, $namd->temperature ]
                  ,"mode" => "lines"
                  ,"line" => [
@@ -435,8 +438,6 @@ function init_ui() {
     }
 
     # $ga->tcpmessage( [ "_textarea" => "temperature: $namd->temperature\n" . json_encode( $namd->run_t_plot, JSON_PRETTY_PRINT ) . "\n" ] );
-
-    $namd->min_plot_done = false;
 }
 
 function update_ui( $message = true ) {
@@ -459,51 +460,43 @@ function update_ui( $message = true ) {
     
     ## create plotly plot
 
-    $namd->min_e_plot->data[0]->x = [];
-    $namd->min_e_plot->data[0]->y = [];
     $namd->run_e_plot->data[0]->x = [];
     $namd->run_e_plot->data[0]->y = [];
     $namd->run_t_plot->data[0]->x = [];
     $namd->run_t_plot->data[0]->y = [];
 
-    $min_done = $namd->min_plot_done;
-    
     $lastt = 0;
 
     foreach ( $Es as $v ) {
         $l = preg_split( "/\s+/", $v );
         if ( count( $l ) > 14 ) {
             $lastt = intval( $l[1] );
-            if ( intval( $l[1] ) < $namd->min_steps ) {
-                $namd->min_e_plot->data[0]->x[] = $l[1];
-                $namd->min_e_plot->data[0]->y[] = $l[14];
-            } else {
-                $min_done = true;
-                $namd->run_e_plot->data[0]->x[] = $l[1];
-                $namd->run_e_plot->data[0]->y[] = $l[14];
-                $namd->run_t_plot->data[0]->x[] = $l[1];
-                $namd->run_t_plot->data[0]->y[] = $l[12];
-            }
+            $namd->run_e_plot->data[0]->x[] = $l[1];
+            $namd->run_e_plot->data[0]->y[] = $l[14];
+            $namd->run_t_plot->data[0]->x[] = $l[1];
+            $namd->run_t_plot->data[0]->y[] = $l[12];
                 
             # $ga->tcpmessage( [ "_textarea" => "data $l[1] $l[14]\n" ] );
         }
     }
         
-    # $ga->tcpmessage( [ "_textarea" => json_encode( $min_e_plot, JSON_PRETTY_PRINT ) . "\n" ] );
     if ( $message ) {
-        if ( !$namd->min_plot_done ) {
-            $ga->tcpmessage( [
-                                 "min_e_plot" => $namd->min_e_plot
-                                 ,"_progress" => $lastt / ( $namd->min_steps + $namd->run_steps )
-                             ] );
-        }
-        $namd->min_plot_done = $min_done;
-        if ( $min_done ) {
-            $ga->tcpmessage( [
-                                 "run_e_plot" => $namd->run_e_plot
-                                 ,"run_t_plot" => $namd->run_t_plot
-                                 ,"_progress" => $lastt / ( $namd->min_steps + $namd->run_steps )
-                             ] );
-        }
+
+        ## gpu stats:
+
+        ## example:
+        ### nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv 
+        ### timestamp, utilization.gpu [%], utilization.memory [%], memory.total [MiB], memory.free [MiB], memory.used [MiB]
+        ### 2022/09/18 16:54:44.107, 87 %, 3 %, 8192 MiB, 6884 MiB, 647 MiB
+
+        $cmd = "nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv";
+        $nvstats = `$cmd`;
+        $ga->tcpmessage( [ "_textarea" => $nvstats ] );
+        
+        $ga->tcpmessage( [
+                             "run_e_plot" => $namd->run_e_plot
+                             ,"run_t_plot" => $namd->run_t_plot
+                             ,"_progress" => $lastt / ( $namd->run_steps )
+                         ] );
     }
 }

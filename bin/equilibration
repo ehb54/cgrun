@@ -304,7 +304,6 @@ $tgzfiles = [
     ,"$ifile.stderr"
     ,"${ifile}_last.pdb"
     ,"${ifile}_last_dry.pdb"
-    ,"xyz.not.there"
     ];
 
 $cmd = "cd charmm-gui/namd && ls -1 " . implode( " ", $tgzfiles ) . " 2> /dev/null";

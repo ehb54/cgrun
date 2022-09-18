@@ -66,7 +66,7 @@
             ,"id"        : "inputlink"
             ,"label"     : "NAMD input"
             ,"type"      : "file"
-            ,"help"      : "Produced by CHARMM-gui (unless it was manually modified or Simulation parameters were changed). Right click to download"
+            ,"help"      : "Produced by CHARMM-gui (unless it was manually modified or <i>Simulation parameters</i> were changed). Right click to download"
         }
         ,{
             "role"       : "output"

@@ -1,7 +1,7 @@
 {
     "moduleid"    : "production"
     ,"label"      : "Production"
-    ,"help"       : "Run production - only possible after minimization"
+    ,"help"       : "Run production - only possible after equilibration"
     ,"executable" : "production"
     ,"resource"   : "oscluster"
 #    ,"dependencies" : [ 
@@ -28,7 +28,7 @@
             ,"type"      : "listbox"
             ,"values"    : "1/5 A100 GPU~g3_small~2/5 A100 GPU~g3_medium~3/5 A100 GPU~g3_large~4/5 A100 GPU~g3_xl"
             ,"default"   : "g3_medium"
-            ,"help"      : "Select the fraction of 1 A100 GPU to use.<br>Use the smallest fraction which does not run out of GPU memory for most SU-efficient usage."
+            ,"help"      : "Select the fraction of an A100 GPU to use.<br>Use the smallest fraction which does not run out of GPU memory for most SU-efficient usage."
         }
         ,{
             "role"         : "input"
@@ -71,7 +71,7 @@
             ,"id"        : "inputlink"
             ,"label"     : "NAMD input"
             ,"type"      : "file"
-            ,"help"      : "Produced by CHARMM-gui (unless it was manually modified or Simulation parameters were changed). Right click to download"
+            ,"help"      : "Produced by CHARMM-gui (unless it was manually modified or <i>Simulation parameters</i> were changed). Right click to download"
         }
         ,{
             "role"       : "output"
