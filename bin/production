@@ -7,7 +7,8 @@
 $namd3          = __DIR__ . "/namd/NAMD_3.0alpha13_Linux-x86_64-multicore-CUDA/namd3";
 
 #### the CHARMM-gui generated base file name ".inp" extension is assumed and not provided here
-$ifile          = "step5_production";
+
+$rfile          = "step5_production";      # reference for creating inp
 
 ####  number seconds between checking to see if the NAMD process is still running
 $poll_interval_seconds = 5;
@@ -55,7 +56,7 @@ $fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
 #### would be nice to do this before openstack :(
 #### another case for early defaults? or pre-submit hook !
 
-if ( file_exists(  "charmm-gui/namd/$ifile.dcd" ) ) {
+if ( file_exists(  "charmm-gui/namd/$ofile.dcd" ) ) {
     $response =
         json_decode(
             $ga->tcpquestion(
@@ -119,8 +120,33 @@ $cores = $appconfig->resources->oscluster->properties->flavors->{ str_replace( "
 
 ## is this a proper project that has been "load"'d
 
-if ( !file_exists( "charmm-gui/namd/step4_equilibration.dcd" ) ) {
-    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for production,<br>Did you run <i>equilibration</i> yet?<br>You can change projects in user configuration (top right)"}}';
+### get last previous run to determine next step to run
+
+$next_count = "0000";
+$prevruns       = glob( 'charmm-gui/namd/prod[0123456789][0123456789][0123456789][0123456789].dcd' );
+# $ga->tcpmessage( [ "_textarea" => "prevruns:\n" . json_encode( $prevruns, JSON_PRETTY_PRINT ) . "\n" ] );
+if ( $prevruns === false || !count( $prevruns ) ) {
+    $ifile      = "step4_equilibration";   # previous run name
+    $ofile      = "prod0000";            # this output
+} else {
+    $prev_count  = str_replace( ".dcd", "", str_replace( "charmm-gui/namd/prod", "", end( $prevruns ) ) );
+    $next_count  = str_pad( sprintf( "%d", $prev_count + 1 ), 4, "0", STR_PAD_LEFT );
+    $ifile  = "prod$prev_count";
+    $ofile  = "prod$next_count";
+}
+
+$ga->tcpmessage( [ "_textarea" => "Starting from prior run: $ifile.*\nNext results will be in: $ofile.*\n" ] );
+
+if ( !file_exists( "charmm-gui/namd/$ifile.dcd" ) 
+     || !file_exists( "charmm-gui/namd/$ifile.coor" )
+     || !file_exists( "charmm-gui/namd/$ifile.vel" )
+     || !file_exists( "charmm-gui/namd/$ifile.xsc" )
+    ) {
+    if ( $next_count == "0000" ) {
+        echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for production.<br>Did you run <i>equilibration</i> yet?<br>You can change projects in user configuration (top right)"}}';
+    } else {
+        echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> prior production run <i>prod' . $prev_count . '</i> is somehow incomplete.<br>Did you manually remove any files?<br>Best current suggestion is to start again from <i>load</i>"}}';
+    }
     exit;
 }
 
@@ -135,23 +161,45 @@ if ( !file_exists( "charmm-gui/namd/$ifile.inp" ) ) {
     exit;
 }
 
-## validate $ifile.inp
-
-if ( count( explode( "\n", `grep -Pi '^numsteps ' charmm-gui/namd/$ifile.inp` ) ) != 2
-     || count( explode( "\n", `grep -Pi '^run ' charmm-gui/namd/$ifile.inp` ) ) != 2
-    ) {
-    echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> does not contain exactly one <i>numsteps</i> line and exactly one <i>run<i> line.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was somehow modified after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+if ( !file_exists( "charmm-gui/namd/$rfile.inp" ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $rfile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
     exit;
 }
 
-## update $ifile.inp if needed
+## make $ofile.inp
+
+$inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$rfile.inp" ) );
+$addlines = [
+    'outputName'       => "outputName              $ofile"
+    ,'set inputname'   => "set inputname           $ifile"
+    ];
+$inpnew   = $inplines;
+foreach ( $addlines as $k => $v ) {
+    $inpnew = preg_replace( "/^$k .*\$/i", $v, $inpnew, -1, $rplc_count );
+    if ( $rplc_count == 0 ) {
+        array_unshift( $inpnew, $v );
+    }
+}
+
+file_put_contents( "charmm-gui/namd/$ofile.inp", implode( "\n", $inpnew ) );
+
+## validate $ofile.inp
+
+if ( count( explode( "\n", `grep -Pi '^numsteps ' charmm-gui/namd/$ofile.inp` ) ) != 2
+     || count( explode( "\n", `grep -Pi '^run ' charmm-gui/namd/$ofile.inp` ) ) != 2
+    ) {
+    echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ofile . '.inp</i> does not contain exactly one <i>numsteps</i> line and exactly one <i>run<i> line.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was somehow modified after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+    exit;
+}
+
+## update $ofile.inp if needed
 if (
     isset( $input->numsteps )
     || isset( $input->run_steps )
     || isset( $input->dcdfreq )
     || isset( $input->temperature )
     ) {
-    $inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ifile.inp" ) );
+    $inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ofile.inp" ) );
     $inpnew = preg_replace(
         [
          '/^set temp\s*(\d+)/'
@@ -171,7 +219,7 @@ if (
         echo '{"_message":{"icon":"toast.png","text":"Error replacing values in input script<br>Try <i>load</i> again.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
         exit;
     }
-    file_put_contents( "charmm-gui/namd/$ifile.inp", implode( "\n", $inpnew ) );
+    file_put_contents( "charmm-gui/namd/$ofile.inp", implode( "\n", $inpnew ) );
 }
 
 ## verfiy and add additional parameters to .inp for namd3 GPU
@@ -179,7 +227,7 @@ $addcuda = [
     'CUDASOAintegrate' => 'CUDASOAintegrate        on;'
     ,'margin'          => 'margin                  4;'
     ];
-$inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ifile.inp" ) );
+$inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ofile.inp" ) );
 $inpnew   = $inplines;
 foreach ( $addcuda as $k => $v ) {
     $inpnew = preg_replace( "/^$k .*\$/i", $v, $inpnew, -1, $rplc_count );
@@ -188,8 +236,8 @@ foreach ( $addcuda as $k => $v ) {
     }
 }
 if ( $inplines != $inpnew ) {
-    file_put_contents( "charmm-gui/namd/$ifile.inp", implode( "\n", $inpnew ) );
-    $ga->tcpmessage( [ "_textarea" => "Updated $ifile.inp to add " . implode( " ", array_keys( $addcuda ) ) . "\n" ] );
+    file_put_contents( "charmm-gui/namd/$ofile.inp", implode( "\n", $inpnew ) );
+    $ga->tcpmessage( [ "_textarea" => "Updated $ofile.inp to add " . implode( " ", array_keys( $addcuda ) ) . "\n" ] );
 }    
 
 ## final check existence
@@ -201,20 +249,22 @@ if ( !file_exists( $namd3 ) ) {
 
 ## create the command
 
-$cmd = "cd charmm-gui/namd && $timeout $namd3 +idlepoll +p1 +devices 0 $ifile.inp 2> $ifile.stderr > $ifile.stdout";
+$cmd = "cd charmm-gui/namd && $timeout $namd3 +idlepoll +p1 +devices 0 $ofile.inp 2> $ofile.stderr > $ofile.stdout";
 $ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
 
 ## ready to run, fork & execute cmd in child
+# echo '{"_message":{"icon":"toast.png","text":"testing..."}}';
+# exit();
 
 $deletes = [ ".stdout", ".dcd", "_last.dcd", "_last.pdb", "_last_dry.pdb", "_results.tgz" ];
 
 foreach ( $deletes as $v ) {
-    if ( file_exists( "charmm-gui/namd/$ifile$v" ) ) {
-        unlink( "charmm-gui/namd/$ifile$v" );
+    if ( file_exists( "charmm-gui/namd/$ofile$v" ) ) {
+        unlink( "charmm-gui/namd/$ofile$v" );
     }
 }
 
-$ga->tcpmessage( [ "inputlink" => "$fdir/charmm-gui/namd/$ifile.inp" ] );
+$ga->tcpmessage( [ "inputlink" => "$fdir/charmm-gui/namd/$ofile.inp" ] );
 
 ## fork ... child will exec
 
@@ -254,8 +304,8 @@ if ( $pid ) {
     pcntl_waitpid( $pid, $status );
     ## namd returns status zero even if it fails :(
     ## $ga->tcpmessage( [ "_textarea" => sprintf( "exit status %s\n", pcntl_wexitstatus( $status ) ) ] );
-    if ( file_exists( "charmm-gui/namd/${ifile}.stderr" ) && filesize( "charmm-gui/namd/${ifile}.stderr" ) ) {
-        $ga->tcpmessage( [ "_textarea" => "NAMD errors:\n----\n" . file_get_contents( "charmm-gui/namd/${ifile}.stderr" ) . "\n----\n" ] );
+    if ( file_exists( "charmm-gui/namd/${ofile}.stderr" ) && filesize( "charmm-gui/namd/${ofile}.stderr" ) ) {
+        $ga->tcpmessage( [ "_textarea" => "NAMD errors:\n----\n" . file_get_contents( "charmm-gui/namd/${ofile}.stderr" ) . "\n----\n" ] );
         $errors = true;
     }
     update_ui();
@@ -263,7 +313,7 @@ if ( $pid ) {
     ## child
     ob_start();
     $ga->tcpmessage( [ "_textarea" => "\nProduction job starting\n" ] );
-    $ga->tcpmessage( [ "stdoutlink" => "$fdir/charmm-gui/namd/$ifile.stdout" ] );
+    $ga->tcpmessage( [ "stdoutlink" => "$fdir/charmm-gui/namd/$ofile.stdout" ] );
     $time_start = dt_now();
     shell_exec( $cmd );
     $time_end   = dt_now();
@@ -279,24 +329,24 @@ if ( $pid ) {
 
 ## dcd->pdb
 
-if ( file_exists( "charmm-gui/namd/$ifile.dcd" ) ) {
-    $cmd = "cd charmm-gui/namd && " . __DIR__ . "/util/catdcd -num $ifile.dcd | grep -P '^Total frames' | awk '{ print \$3 }'";
+if ( file_exists( "charmm-gui/namd/$ofile.dcd" ) ) {
+    $cmd = "cd charmm-gui/namd && " . __DIR__ . "/util/catdcd -num $ofile.dcd | grep -P '^Total frames' | awk '{ print \$3 }'";
     $lframe = intval( `$cmd 2>/dev/null` );
     if ( $lframe > 1 ) {
         # $ga->tcpmessage( [ "_textarea" => "checking for dcd to make pdb - lframe > 1\n" ] );
         ## need 2 frames for mdconvert
         $lframe--;
-        $cmd = "cd charmm-gui/namd && " . __DIR__ . "/util/catdcd  -first $lframe -o ${ifile}_last.dcd $ifile.dcd";
+        $cmd = "cd charmm-gui/namd && " . __DIR__ . "/util/catdcd  -first $lframe -o ${ofile}_last.dcd $ofile.dcd";
         `$cmd 2>&1 > /dev/null`;
-        if ( file_exists( "charmm-gui/namd/${ifile}_last.dcd" ) ) {
-            $cmd = "cd charmm-gui/namd && mdconvert -f -o ${ifile}_last.pdb -t step3_input.pdb -i -1 ${ifile}_last.dcd";
+        if ( file_exists( "charmm-gui/namd/${ofile}_last.dcd" ) ) {
+            $cmd = "cd charmm-gui/namd && mdconvert -f -o ${ofile}_last.pdb -t step3_input.pdb -i -1 ${ofile}_last.dcd";
             `$cmd 2>&1 > /dev/null`;
-            if ( file_exists( "charmm-gui/namd/${ifile}_last.pdb" ) ) {
-                $cmd = "cd charmm-gui/namd && grep -Pv ' (HOH|POT POT|SOD  SOD|CLA  CLA) ' ${ifile}_last.pdb > ${ifile}_last_dry.pdb";
+            if ( file_exists( "charmm-gui/namd/${ofile}_last.pdb" ) ) {
+                $cmd = "cd charmm-gui/namd && grep -Pv ' (HOH|POT POT|SOD  SOD|CLA  CLA) ' ${ofile}_last.pdb > ${ofile}_last_dry.pdb";
                 #$ga->tcpmessage( [ "_textarea" => "nowat cmd $cmd\n" ] );
                 `$cmd 2> /dev/null`;
-                if ( file_exists( "charmm-gui/namd/${ifile}_last_dry.pdb" ) ) {
-                    $output->pdblastdry = "$fdir/charmm-gui/namd/${ifile}_last_dry.pdb";
+                if ( file_exists( "charmm-gui/namd/${ofile}_last_dry.pdb" ) ) {
+                    $output->pdblastdry = "$fdir/charmm-gui/namd/${ofile}_last_dry.pdb";
                 } else {
                     $ga->tcpmessage( [ "_textarea" => "Notice: failed to extract solvent from pdb, so no pdb will be created for visualization\n" ] );
                 }
@@ -316,37 +366,39 @@ if ( file_exists( "charmm-gui/namd/$ifile.dcd" ) ) {
 ## tar gz output
 
 $tgzfiles = [
-    "$ifile.vel"
-    ,"$ifile.coor"
-    ,"$ifile.xsc"
-    ,"$ifile.xst"
-    ,"$ifile.stdout"
-    ,"$ifile.stderr"
-    ,"${ifile}_last.pdb"
-    ,"${ifile}_last_dry.pdb"
+    "$ofile.vel"
+    ,"$ofile.coor"
+    ,"$ofile.xsc"
+    ,"$ofile.xst"
+    ,"$ofile.stdout"
+    ,"$ofile.stderr"
+    ,"${ofile}_last.pdb"
+    ,"${ofile}_last_dry.pdb"
     ];
 
 $cmd = "cd charmm-gui/namd && ls -1 " . implode( " ", $tgzfiles ) . " 2> /dev/null";
 exec( $cmd, $tgzfilesfound );
-$cmd = "cd charmm-gui/namd && tar -I pigz -cf ${ifile}_results.tgz " . implode( " ", $tgzfilesfound );
+$cmd = "cd charmm-gui/namd && tar -I pigz -cf ${ofile}_results.tgz " . implode( " ", $tgzfilesfound );
 `$cmd 2>&1 > /dev/null`;
 
     
 update_ui( false );
 
-$output->inputlink  = "$fdir/charmm-gui/namd/$ifile.inp";
-if ( file_exists( "charmm-gui/namd/$ifile.dcd" ) ) {
-    $output->dcdlink    = "$fdir/charmm-gui/namd/$ifile.dcd";
+$output->inputlink  = "$fdir/charmm-gui/namd/$ofile.inp";
+if ( file_exists( "charmm-gui/namd/$ofile.dcd" ) ) {
+    $output->dcdlink    = "$fdir/charmm-gui/namd/$ofile.dcd";
 }
-$output->stdoutlink = "$fdir/charmm-gui/namd/$ifile.stdout";
-if ( file_exists( "charmm-gui/namd/${ifile}_results.tgz" ) ) {
-    $output->tgzlink    = "$fdir/charmm-gui/namd/${ifile}_results.tgz";
+$output->stdoutlink = "$fdir/charmm-gui/namd/$ofile.stdout";
+if ( file_exists( "charmm-gui/namd/${ofile}_results.tgz" ) ) {
+    $output->tgzlink    = "$fdir/charmm-gui/namd/${ofile}_results.tgz";
 }
 
-if ( file_exists( "charmm-gui/namd/$ifile.stdout" ) && filesize( "charmm-gui/namd/$ifile.stdout" ) > 0 ) {
+if ( file_exists( "charmm-gui/namd/$ofile.stdout" ) && filesize( "charmm-gui/namd/$ofile.stdout" ) > 0 ) {
     $output->run_e_plot = $namd->run_e_plot;
     $output->run_t_plot = $namd->run_t_plot;
 }
+
+$output->gpustats = $namd->gpustats->msg;
 
 $output->_textarea = "";
 
@@ -361,7 +413,7 @@ echo json_encode( $output );
 ## ui bits should really be a class
 
 function init_ui() {
-    global $ifile;
+    global $ofile;
     global $namd;
     global $ga;
 
@@ -415,8 +467,8 @@ function init_ui() {
     $namd->run_t_plot->layout->title              = "Run Temperature";
     $namd->run_t_plot->layout->yaxis->title->text = "Temperature";
 
-    $namd->run_steps   = intval( `grep -Pi '^run ' charmm-gui/namd/$ifile.inp  | awk '{ print \$2 }'` );
-    $namd->temperature = floatval( `grep -Pi '^set temp ' charmm-gui/namd/$ifile.inp  | awk '{ print \$3 }'` );
+    $namd->run_steps   = intval( `grep -Pi '^run ' charmm-gui/namd/$ofile.inp  | awk '{ print \$2 }'` );
+    $namd->temperature = floatval( `grep -Pi '^set temp ' charmm-gui/namd/$ofile.inp  | awk '{ print \$3 }'` );
 
     if ( $namd->run_steps > 0 ) {
         $namd->run_e_plot->layout->xaxis->range = [0, $namd->run_steps ];
@@ -442,12 +494,12 @@ function init_ui() {
 
 function update_ui( $message = true ) {
     global $ga;
-    global $ifile;
+    global $ofile;
     global $namd;
 
     # $ga->tcpmessage( [ "_textarea" => "update_ui()\n" ] );
 
-    $cmd = "grep -P '^ENERGY:' charmm-gui/namd/$ifile.stdout 2> /dev/null";
+    $cmd = "grep -P '^ENERGY:' charmm-gui/namd/$ofile.stdout 2> /dev/null";
     $allE = `$cmd`;
     $Es = explode( "\n", $allE );
     if ( count( $Es ) < 2 ) {
@@ -489,14 +541,95 @@ function update_ui( $message = true ) {
         ### timestamp, utilization.gpu [%], utilization.memory [%], memory.total [MiB], memory.free [MiB], memory.used [MiB]
         ### 2022/09/18 16:54:44.107, 87 %, 3 %, 8192 MiB, 6884 MiB, 647 MiB
 
-        $cmd = "nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv";
+
+        $cmd = "nvidia-smi --query-gpu=utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv | tail -1";
         $nvstats = `$cmd`;
-        $ga->tcpmessage( [ "_textarea" => $nvstats ] );
+        $nvstats = explode( ",", preg_replace( '/ (%|MiB)/', '', $nvstats ) );
+
+        $gpu_util  = $nvstats[0];
+        $mem_util  = $nvstats[1];
+        $mem_total = $nvstats[2];
+        $mem_free  = $nvstats[3];
+        $mem_used  = $nvstats[4];
+
+        if ( !isset( $namd->gpustats ) ) {
+            $namd->gpustats = (Object)[];
+            $namd->gpustats->max_gpu_util  = $gpu_util;
+            $namd->gpustats->max_mem_util  = $mem_util;
+            $namd->gpustats->min_mem_free  = $mem_free;
+            $namd->gpustats->max_mem_used  = $mem_used;
+        }
+        
+        $namd->gpustats->gpu_util  = $gpu_util;
+        $namd->gpustats->mem_util  = $mem_util;
+        $namd->gpustats->mem_total = $mem_total;
+        $namd->gpustats->mem_free  = $mem_free;
+        $namd->gpustats->mem_used  = $mem_used;
+
+        if ( $namd->gpustats->max_gpu_util < $gpu_util ) {
+            $namd->gpustats->max_gpu_util = $gpu_util;
+        }
+        
+        if ( $namd->gpustats->max_mem_util < $mem_util ) {
+            $namd->gpustats->max_mem_util = $mem_util;
+        }
+
+        if ( $namd->gpustats->min_mem_free > $mem_free ) {
+            $namd->gpustats->min_mem_free = $mem_free;
+        }
+
+        if ( $namd->gpustats->max_mem_used < $mem_used ) {
+            $namd->gpustats->max_mem_used = $mem_used;
+        }
+
+        $namd->gpustats->msg =
+            sprintf(
+                "<table>"
+                . "<tr>"
+                . "<th style=\"padding-right:5px;padding-left:5px;\"></th>"
+                . "<th style=\"padding-right:5px;padding-left:5px;\">Last</th>"
+                . "<th style=\"padding-right:5px;padding-left:5px;\">Max</th>"
+                . "</tr>"
+                . "<tr>"
+                . "<th>GPU %%</th>"
+                . "<td style=\"text-align:center\"> %d </td>"
+                . "<td style=\"text-align:center\"> %d </td>"
+                . "<tr>"
+                . "<th>Memory Used %%</th>"
+                . "<td style=\"text-align:center\"> %d </td>"
+                . "<td style=\"text-align:center\"> %d </td>"
+                . "<tr>"
+                . "<th>Memory Used MB</th>"
+                . "<td style=\"text-align:center\"> %d </td>"
+                . "<td style=\"text-align:center\"> %d </td>"
+                . "<tr>"
+                . "</table>"
+
+                #"GPU Utilization: %d% [Max %d%]<br>"
+                #. "Memory Utilization: %d% [Max %d%]<br>"
+                #. "Memory Used: %d [Max %d]<br>"
+                #. "Memory Free: %d [Min %d]<br>"
+
+                , $namd->gpustats->gpu_util
+                , $namd->gpustats->max_gpu_util
+
+                , $namd->gpustats->mem_util
+                , $namd->gpustats->max_mem_util
+
+                , $namd->gpustats->mem_used
+                , $namd->gpustats->max_mem_used
+
+                #, $namd->gpustats->mem_free
+                #, $namd->gpustats->min_mem_free
+            );
+        
+#        $ga->tcpmessage( [ "_textarea" => $nvstats ] );
         
         $ga->tcpmessage( [
                              "run_e_plot" => $namd->run_e_plot
                              ,"run_t_plot" => $namd->run_t_plot
                              ,"_progress" => $lastt / ( $namd->run_steps )
+                             ,"gpustats" => $namd->gpustats->msg
                          ] );
     }
 }
