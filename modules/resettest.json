@@ -1,0 +1,41 @@
+{
+    "moduleid"    : "resettest"
+    ,"label"      : "Test load defaults"
+    ,"help"       : "help for test load defaults"
+    ,"executable" : "resettest.php"
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Test reset"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+        ,{
+            "role"        : "input"
+            ,"id"         : "textfield"
+            ,"label"      : "Text field"
+            ,"type"       : "text"
+        }
+        ,{
+            "role"        : "output"
+            ,"id"         : "result"
+            ,"label"      : "Result text"
+            ,"type"       : "text"
+        }
+        ,{
+            "role"        : "output"
+            ,"id"         : "fileout"
+            ,"label"      : "File"
+            ,"type"       : "file"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "gpustats"
+            ,"type"      : "html"
+            ,"label"     : "Result html"
+        }
+    ]
+}

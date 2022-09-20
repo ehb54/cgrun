@@ -38,6 +38,10 @@
                     "id"    : "messagephp"
                     ,"label" : "messaging php"
                 }
+                ,{ 
+                    "id"    : "resettest"
+                    ,"label" : "reset"
+                }
             ]
         }
         ,{
