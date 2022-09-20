@@ -153,13 +153,13 @@ if (
     $inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ifile.inp" ) );
     $inpnew = preg_replace(
         [
-         '/^set temp\s*(\d+)/'
+         '/^set temp\s+.*$/'
          ,'/^dcdfreq(\s*)(\d+)/'
          ,'/^minimize(\s*)(\d+)/'
          ,'/^run(\s*)(\d+)/'
         ],
         [
-         "set temp                $input->temperature"
+         "set temp                $input->temperature;"
          ,"dcdfreq                 $input->dcdfreq"
          ,"minimize                $input->min_steps"
          ,"run                     $input->run_steps"

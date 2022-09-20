@@ -124,6 +124,8 @@ $cores = $appconfig->resources->oscluster->properties->flavors->{ str_replace( "
 
 $next_count = "0000";
 $prevruns       = glob( 'charmm-gui/namd/prod[0123456789][0123456789][0123456789][0123456789].dcd' );
+$firsttimestep  = 0; 
+
 # $ga->tcpmessage( [ "_textarea" => "prevruns:\n" . json_encode( $prevruns, JSON_PRETTY_PRINT ) . "\n" ] );
 if ( $prevruns === false || !count( $prevruns ) ) {
     $ifile      = "step4_equilibration";   # previous run name
@@ -131,11 +133,39 @@ if ( $prevruns === false || !count( $prevruns ) ) {
 } else {
     $prev_count  = str_replace( ".dcd", "", str_replace( "charmm-gui/namd/prod", "", end( $prevruns ) ) );
     $next_count  = str_pad( sprintf( "%d", $prev_count + 1 ), 4, "0", STR_PAD_LEFT );
-    $ifile  = "prod$prev_count";
-    $ofile  = "prod$next_count";
+    $ifile    = "prod$prev_count";
+    $ofile    = "prod$next_count";
+
+    ## get firsttimestep
+
+    if ( !file_exists( "charmm-gui/namd/$ifile.inp" ) ) {
+        echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+        exit;
+    }
+
+    $inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ifile.inp" ) );
+    $matches  = preg_grep( '/^firsttimestep\s+/', $inplines );
+    if ( count( $matches ) > 1 ) {
+        echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> has multiple <i>firsttimestep</i> lines.<br>This must have been manually edited or there is some bug in the code.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+        exit;
+    }
+    if ( count( $matches ) == 1 ) {
+        $firsttimestep = preg_replace( '/^firsttimestep\s+/', '', array_values($matches)[0] );
+    }
+    $matches  = preg_grep( '/^run\s+/', $inplines );
+    if ( count( $matches ) > 1 ) {
+        echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> has multiple <i>run</i> lines.<br>This must have been manually edited or there is some bug in the code.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+        exit;
+    }
+    if ( $matches === false || count( $matches ) == 0 ) {
+        echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> has multiple <i>run</i> lines.<br>This must have been manually edited or there is some bug in the code.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+        exit;
+    }
+    $lastrun = preg_replace( '/^run\s+/', '', array_values($matches)[0] );
+    $firsttimestep += $lastrun;
 }
 
-$ga->tcpmessage( [ "_textarea" => "Starting from prior run: $ifile.*\nNext results will be in: $ofile.*\n" ] );
+$ga->tcpmessage( [ "_textarea" => "Starting from prior run: $ifile.*\nNext results will be in: $ofile.*\nStarting time step     : $firsttimestep\n" ] );
 
 if ( !file_exists( "charmm-gui/namd/$ifile.dcd" ) 
      || !file_exists( "charmm-gui/namd/$ifile.coor" )
@@ -172,6 +202,7 @@ $inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$rfile.inp" ) );
 $addlines = [
     'outputName'       => "outputName              $ofile"
     ,'set inputname'   => "set inputname           $ifile"
+    ,'firsttimestep'   => "firsttimestep           $firsttimestep"
     ];
 $inpnew   = $inplines;
 foreach ( $addlines as $k => $v ) {
@@ -202,13 +233,13 @@ if (
     $inplines = explode( "\n", file_get_contents( "charmm-gui/namd/$ofile.inp" ) );
     $inpnew = preg_replace(
         [
-         '/^set temp\s*(\d+)/'
+         '/^set temp\s+.*$/'
          ,'/^dcdfreq(\s*)(\d+)/'
          ,'/^numsteps(\s*)(\d+)/'
          ,'/^run(\s*)(\d+)/'
         ],
         [
-         "set temp                $input->temperature"
+         "set temp                $input->temperature;"
          ,"dcdfreq                 $input->dcdfreq"
          ,"numsteps                $input->numsteps"
          ,"run                     $input->run_steps"
@@ -253,8 +284,10 @@ $cmd = "cd charmm-gui/namd && $timeout $namd3 +idlepoll +p1 +devices 0 $ofile.in
 $ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
 
 ## ready to run, fork & execute cmd in child
-# echo '{"_message":{"icon":"toast.png","text":"testing..."}}';
-# exit();
+
+## testing
+#echo '{"_message":{"icon":"toast.png","text":"testing..."}}';
+#exit();
 
 $deletes = [ ".stdout", ".dcd", "_last.dcd", "_last.pdb", "_last_dry.pdb", "_results.tgz" ];
 
@@ -416,9 +449,12 @@ function init_ui() {
     global $ofile;
     global $namd;
     global $ga;
+    global $firsttimestep;
 
     $namd = (object)[];
     
+    $namd ->firsttimestep = $firsttimestep;
+
     $namd->run_e_plot = json_decode(
         '{
             "data" : [
@@ -471,12 +507,12 @@ function init_ui() {
     $namd->temperature = floatval( `grep -Pi '^set temp ' charmm-gui/namd/$ofile.inp  | awk '{ print \$3 }'` );
 
     if ( $namd->run_steps > 0 ) {
-        $namd->run_e_plot->layout->xaxis->range = [0, $namd->run_steps ];
-        $namd->run_t_plot->layout->xaxis->range = [0, $namd->run_steps ];
+        $namd->run_e_plot->layout->xaxis->range = [$namd->firsttimestep, $namd->firsttimestep + $namd->run_steps ];
+        $namd->run_t_plot->layout->xaxis->range = [$namd->firsttimestep, $namd->firsttimestep + $namd->run_steps ];
         if ( $namd->temperature > 0 ) {
             $namd->run_t_plot->data[] =
                 [
-                 "x" => [ 0, $namd->run_steps ]
+                 "x" => [ $namd->firsttimestep, $namd->firsttimestep + $namd->run_steps ]
                  ,"y" => [ $namd->temperature, $namd->temperature ]
                  ,"mode" => "lines"
                  ,"line" => [
@@ -591,15 +627,15 @@ function update_ui( $message = true ) {
                 . "<th style=\"padding-right:5px;padding-left:5px;\">Max</th>"
                 . "</tr>"
                 . "<tr>"
-                . "<th>GPU %%</th>"
+                . "<th>GPU utilization %%</th>"
                 . "<td style=\"text-align:center\"> %d </td>"
                 . "<td style=\"text-align:center\"> %d </td>"
                 . "<tr>"
-                . "<th>Memory Used %%</th>"
+                . "<th>Memory used %%</th>"
                 . "<td style=\"text-align:center\"> %d </td>"
                 . "<td style=\"text-align:center\"> %d </td>"
                 . "<tr>"
-                . "<th>Memory Used MB</th>"
+                . "<th>Memory used MB</th>"
                 . "<td style=\"text-align:center\"> %d </td>"
                 . "<td style=\"text-align:center\"> %d </td>"
                 . "<tr>"
@@ -628,7 +664,7 @@ function update_ui( $message = true ) {
         $ga->tcpmessage( [
                              "run_e_plot" => $namd->run_e_plot
                              ,"run_t_plot" => $namd->run_t_plot
-                             ,"_progress" => $lastt / ( $namd->run_steps )
+                             ,"_progress" => ( $lastt - $namd->firsttimestep ) / $namd->run_steps
                              ,"gpustats" => $namd->gpustats->msg
                          ] );
     }
