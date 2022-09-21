@@ -241,7 +241,8 @@ if (
         [
          "set temp                $input->temperature;"
          ,"dcdfreq                 $input->dcdfreq"
-         ,"numsteps                $input->numsteps"
+#         ,"numsteps                $input->numsteps"
+         ,"numsteps                $input->run_steps"
          ,"run                     $input->run_steps"
         ]
         ,$inplines
@@ -568,6 +569,14 @@ function update_ui( $message = true ) {
         }
     }
         
+    ## timing
+
+    $cmd = "grep -P '^TIMING:' charmm-gui/namd/$ofile.stdout | tail -1 | awk '{ print \$9 \" \" \$11 }' 2> /dev/null";
+    $timing = explode( ' ', `$cmd` );
+    if ( count( $timing ) > 1 ) {
+        $namd->timing = sprintf( "%.3f ns/day  %.4f hours remaining", $timing[0], $timing[1] );
+    }
+
     if ( $message ) {
 
         ## gpu stats:
@@ -666,6 +675,7 @@ function update_ui( $message = true ) {
                              ,"run_t_plot" => $namd->run_t_plot
                              ,"_progress" => ( $lastt - $namd->firsttimestep ) / $namd->run_steps
                              ,"gpustats" => $namd->gpustats->msg
+                             ,"timing" => $namd->timing
                          ] );
     }
 }

@@ -47,18 +47,22 @@
         }
         ,{
             "role"         : "input"
-            ,"id"          : "numsteps"
-            ,"label"       : "Number of steps (?)"
-            ,"type"        : "integer"
-            ,"repeat"      : "sparams"
-        }
-        ,{
-            "role"         : "input"
             ,"id"          : "run_steps"
             ,"label"       : "Run steps"
             ,"type"        : "integer"
             ,"repeat"      : "sparams"
         }
+#        ,{
+#            "role"         : "input"
+#            ,"id"          : "numsteps"
+#            ,"label"       : "Number of steps"
+#            ,"type"        : "text"
+#            ,"repeat"      : "sparams"
+#            ,"readonly"    : "true"
+#            ,"calc"        : "run_steps"
+#            ,"help"        : "Duplicates <i>Run steps</i>"
+#            ,"hidden"      : "true"
+#        }
         ,{
             "role"         : "input"
             ,"id"          : "dcdfreq"
@@ -99,6 +103,12 @@
             ,"id"        : "gpustats"
             ,"type"      : "html"
             ,"label"     : "GPU usage"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "timing"
+            ,"type"      : "html"
+            ,"label"     : "Last timing"
         }
         ,{
             "role"       : "output"
