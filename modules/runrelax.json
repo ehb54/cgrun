@@ -1,0 +1,17 @@
+{
+    "moduleid"    : "runrelax"
+    ,"label"      : "Run"
+    ,"help"       : "Run advanced relaxation"
+    ,"executable" : "runrelax"
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Run advanced relaxation"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+    ]
+}

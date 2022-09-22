@@ -1,0 +1,17 @@
+{
+    "moduleid"    : "preparerelax"
+    ,"label"      : "Prepare"
+    ,"help"       : "Prepare advanced relaxation"
+    ,"executable" : "preparerelax"
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Prepare advanced relaxation"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+    ]
+}

@@ -22,6 +22,21 @@
             ]
         }
         ,{ 
+            "id"         : "relax"
+            ,"label"      : "Relax"
+            ,"icon"       : "pngs/simulate.png"
+            ,"modules" : [ 
+                { 
+                    "id"    : "preparerelax"
+                    ,"label" : "Prepare"
+                }
+                ,{ 
+                    "id"    : "runrelax"
+                    ,"label" : "Run"
+                }
+            ]
+        }
+        ,{ 
             "id"         : "Test"
             ,"label"      : "Test"
             ,"icon"       : "pngs/simulate.png"
