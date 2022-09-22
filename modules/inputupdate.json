@@ -1,0 +1,39 @@
+{
+    "moduleid"    : "inputupdate"
+    ,"label"      : "Inputupdate"
+    ,"help"       : "Run inputupdate - only possible after equilibration"
+    ,"executable" : "inputupdate"
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Run input update test"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "sparams"
+            ,"label"       : "Simulation parameters"
+            ,"type"        : "checkbox"
+            ,"repeater"    : "true"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "description"
+            ,"label"       : "Description"
+            ,"type"        : "textarea"
+            ,"repeat"      : "sparams"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "lastoutput"
+            ,"label"       : "Last output"
+            ,"type"        : "text"
+            ,"readonly"    : "true"
+            ,"repeat"      : "sparams"
+        }
+    ]
+}

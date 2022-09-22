@@ -57,6 +57,10 @@
                     "id"    : "resettest"
                     ,"label" : "reset"
                 }
+                ,{ 
+                    "id"    : "inputupdate"
+                    ,"label" : "input update"
+                }
             ]
         }
         ,{
