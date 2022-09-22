@@ -50,12 +50,17 @@ include "datetime.php";
 $ga = new GenApp( $input, $output );
 $fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
 
+## get state
+
+require "common.php";
+$cgstate = new cgrun_state();
+
 ## check for previous run
 
 #### would be nice to do this before openstack :(
 #### another case for early defaults?
 
-if ( file_exists(  "charmm-gui/namd/$ifile.dcd" ) ) {
+if ( file_exists( "charmm-gui/namd/$ifile.dcd" ) ) {
     $response =
         json_decode(
             $ga->tcpquestion(
@@ -119,7 +124,7 @@ $cores = $appconfig->resources->oscluster->properties->flavors->{ str_replace( "
 
 ## is this a proper project that has been "load"'d
 
-if ( !file_exists( "_loaded" ) ) {
+if ( !$cgstate->state->loaded ) {
     echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for equilibration,<br>Did you <i>load</i> it yet?<br>You can change projects in user configuration (top right)"}}';
     exit;
 }
@@ -182,7 +187,7 @@ if ( !file_exists( $namd2 ) ) {
 
 ## create the command
 
-$cmd = "cd charmm-gui/namd && $timeout $namd2 +idlepoll +p$cores $ifile.inp 2> $ifile.stderr > $ifile.stdout";
+$cmd = "umask 002 && cd charmm-gui/namd && $timeout $namd2 +idlepoll +p$cores $ifile.inp 2> $ifile.stderr > $ifile.stdout";
 $ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
 ## ready to run, fork & execute cmd in child
 
@@ -195,6 +200,12 @@ foreach ( $deletes as $v ) {
 }
 
 $ga->tcpmessage( [ "inputlink" => "$fdir/charmm-gui/namd/$ifile.inp" ] );
+
+unset( $cgstate->state->equilibrated );
+if ( !$cgstate->save() ) {
+    echo '{"_message":{"icon":"toast.png","text":"Save state failed: ' . $cgstate->errors . '"}}';
+    exit;
+}
 
 ## fork ... child will exec
 
@@ -291,6 +302,7 @@ if ( file_exists( "charmm-gui/namd/$ifile.dcd" ) ) {
     }
 } else {
     $ga->tcpmessage( [ "_textarea" => "Notice: No final dcd file found so no pdb will be created for visualization\n" ] );
+    $errors = true;
 }    
 
 ## tar gz output
@@ -336,6 +348,20 @@ $output->_textarea .= "JSON input to executable:\n"  . json_encode( $input, JSON
 # $output->_textarea .= "Command:\n$cmd\n";
 
 $output->_textarea .= "\nEQUILBRATION complete\n";
+
+## update state
+
+if ( !$errors ) {
+    $cgstate->state->equilibrated = true;
+    $cgstate->state->lastoutput   = $ifile;
+    if ( isset( $input->description ) ) {
+        $cgstate->state->description  = $input->description;
+    }
+    if ( !$cgstate->save() ) {
+        echo '{"_message":{"icon":"toast.png","text":"Save state failed:' . $cgstate->errors . '"}}';
+        exit;
+    }
+}
 
 echo json_encode( $output );
 

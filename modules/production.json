@@ -27,16 +27,31 @@
             ,"label"     : "GPU slice"
             ,"type"      : "listbox"
             ,"values"    : "1/5 A100 GPU~g3_small~2/5 A100 GPU~g3_medium~3/5 A100 GPU~g3_large~4/5 A100 GPU~g3_xl"
-            ,"default"   : "g3_medium"
+            ,"default"   : "g3_small"
             ,"help"      : "Select the fraction of an A100 GPU to use.<br>Use the smallest fraction which does not run out of GPU memory for most SU-efficient usage."
         }
         ,{
             "role"         : "input"
             ,"id"          : "sparams"
-            ,"label"       : "Simulation parameters"
+            ,"label"       : "Details"
             ,"type"        : "checkbox"
             ,"repeater"    : "true"
             ,"hook"        : "production_defaults.php"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "description"
+            ,"label"       : "Description"
+            ,"type"        : "textarea"
+            ,"repeat"      : "sparams"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "lastoutput"
+            ,"label"       : "Last output"
+            ,"type"        : "text"
+            ,"readonly"    : "true"
+            ,"repeat"      : "sparams"
         }
         ,{
             "role"         : "input"

@@ -20,10 +20,16 @@ if ( $request === NULL ) {
 
 $ifile = __DIR__ . "/../results/users/$request->_logon/$request->_project/charmm-gui/namd/step4_equilibration.inp";
 
+## get state
+
+require "common.php";
+$cgstate = new cgrun_state();
+
 if ( file_exists( $ifile ) ) {
     $result->{"sparams-min_steps"}   = intval( `grep -Pi '^minimize ' $ifile  | awk '{ print \$2 }'` );
     $result->{"sparams-run_steps"}   = intval( `grep -Pi '^run ' $ifile  | awk '{ print \$2 }'` );
     $result->{"sparams-dcdfreq"}     = intval( `grep -Pi '^dcdfreq ' $ifile  | awk '{ print \$2 }'` );
+    $result->{"sparams-description"} = isset( $cgstate->state->description ) ? $cgstate->state->description : "";
     $result->{"sparams-temperature"} = floatval( `grep -Pi '^set temp ' $ifile | awk '{ print \$3 }'` );
 } else {
     $result->error = "$ifile does not exist";

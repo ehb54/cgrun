@@ -28,10 +28,17 @@
         ,{
             "role"         : "input"
             ,"id"          : "sparams"
-            ,"label"       : "Simulation parameters"
+            ,"label"       : "Details"
             ,"type"        : "checkbox"
             ,"repeater"    : "true"
             ,"hook"        : "equilibration_defaults.php"
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "description"
+            ,"label"       : "Description"
+            ,"type"        : "textarea"
+            ,"repeat"      : "sparams"
         }
         ,{
             "role"         : "input"

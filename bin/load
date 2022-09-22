@@ -25,9 +25,14 @@ $genapp = new GenApp( $input, $output );
 
 ## process inputs here to produce output
 
+## get state
+
+require "common.php";
+$cgstate = new cgrun_state();
+
 ## does the project already exist ?
 
-if ( file_exists( "_loaded" ) ) {
+if ( $cgstate->state->loaded ) {
     $response =
         json_decode(
             $genapp->tcpquestion(
@@ -57,6 +62,13 @@ if ( file_exists( "_loaded" ) ) {
     }
 }
 
+## clear state on until load complete
+
+if ( !$cgstate->init() ) {
+    echo '{"_message":{"icon":"toast.png","text":"Save state failed: ' . $cgstate->errors . '"}}';
+    exit;
+}
+
 ## check if proper file loaded
 
 $cgfile   = $input->cgfile[0];
@@ -80,29 +92,19 @@ if ( !is_dir( "charmm-gui/namd" ) ) {
 }
     
 
-## looks ok so far... write loaded file
-try {
-    file_put_contents( "_loaded", $input->desc . "\n" );
-} catch (Exception $e ) {
-    echo '{"_message":{"icon":"toast.png","text":"Error storing load information"}}';
-    exit;
+## looks ok so far... update state
+
+$cgstate->state->loaded      = true;
+$cgstate->state->description = $input->desc;
+if ( isset( $input->refpdb ) ) {
+    $cgstate->state->refpdb = $input->refpdb;
+} else {
+    unset( $cgstate->state->refpdb );
 }
 
-## save _refpdb info if refpdb present
-if ( isset( $input->refpdb ) ) {
-    try {
-        file_put_contents( "_refpdb", $input->refpdb[0] . "\n" );
-    } catch (Exception $e ) {
-        echo '{"_message":{"icon":"toast.png","text":Error storing reference pdb information"}}';
-        exit;
-    }
-} else {
-    if ( file_exists( "_refpdb" ) ) {
-        if ( false === unlink( "_refpdb" ) ) {
-            echo '{"_message":{"icon":"toast.png","text":"Error removing pre-existing referencd pdb information"}}';
-            exit;
-        }
-    }
+if ( !$cgstate->save() ) {
+    echo '{"_message":{"icon":"toast.png","text":"Save state failed: ' . $cgstate->errors . '"}}';
+    exit;
 }
 
 ## log results to textarea

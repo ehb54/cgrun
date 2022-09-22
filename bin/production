@@ -51,39 +51,21 @@ include "datetime.php";
 $ga = new GenApp( $input, $output );
 $fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
 
+## get state
+
+require "common.php";
+$cgstate = new cgrun_state();
+
 ## check for previous run
 
-#### would be nice to do this before openstack :(
-#### another case for early defaults? or pre-submit hook !
+if ( !$cgstate->state->equilibrated ) {
+    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for production,<br>Did you submit <i>equilibration</i> yet?<br>You can change projects in user configuration (top right)"}}';
+    exit;
+}
 
-if ( file_exists(  "charmm-gui/namd/$ofile.dcd" ) ) {
-    $response =
-        json_decode(
-            $ga->tcpquestion(
-                [
-                 "id"           => "q1"
-                 ,"title"       => "<h5>Project '$input->_project' has previous production results</h5>"
-                 ,"icon"        => "warning.png"
-                 ,"text"        => ""
-                 ,"timeouttext" => "The time to respond has expired, please submit again."
-                 ,"buttons"     => [ "Erase previous results", "Cancel" ]
-                 ,"fields" => [
-                     [
-                      "id"          => "l1"
-                      ,"type"       => "label"
-                      ,"label"      => "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Previous results will be overwritten!"
-                      ,"align"      => "center"
-                     ]
-                 ]
-                ]
-
-            )
-        );
-
-    if ( $response->_response->button == "cancel" ) {
-        echo '{"_message":{"icon":"information.png","text":"Canceled"}}';
-        exit;
-    }
+if ( !$cgstate->state->lastoutput ) {
+    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for production,<br>The last output stage is not defined.<br>You can change projects in user configuration (top right)"}}';
+    exit;
 }
 
 ## process inputs here to produce output
@@ -123,15 +105,23 @@ $cores = $appconfig->resources->oscluster->properties->flavors->{ str_replace( "
 ### get last previous run to determine next step to run
 
 $next_count = "0000";
-$prevruns       = glob( 'charmm-gui/namd/prod[0123456789][0123456789][0123456789][0123456789].dcd' );
+## no longer needed
+## $prevruns       = glob( 'charmm-gui/namd/prod[0123456789][0123456789][0123456789][0123456789].dcd' );
 $firsttimestep  = 0; 
 
-# $ga->tcpmessage( [ "_textarea" => "prevruns:\n" . json_encode( $prevruns, JSON_PRETTY_PRINT ) . "\n" ] );
-if ( $prevruns === false || !count( $prevruns ) ) {
-    $ifile      = "step4_equilibration";   # previous run name
-    $ofile      = "prod0000";            # this output
+if ( isset( $input->lastoutput ) ) {
+## only will be relevant when lastoutput goes readwrite (select pushed from hook)
+    $cgstate->state->lastoutput = $input->lastoutput;
+}
+
+if ( strncmp( "prod", $cgstate->state->lastoutput, 4 ) ) {
+    ## previous state from equilibration or other relax method
+    $ifile      = $cgstate->state->lastoutput;
+    $ofile      = "prod0000";
 } else {
-    $prev_count  = str_replace( ".dcd", "", str_replace( "charmm-gui/namd/prod", "", end( $prevruns ) ) );
+    ## previous production state
+
+    $prev_count  = str_replace( "prod", "", $cgstate->state->lastoutput );
     $next_count  = str_pad( sprintf( "%d", $prev_count + 1 ), 4, "0", STR_PAD_LEFT );
     $ifile    = "prod$prev_count";
     $ofile    = "prod$next_count";
@@ -139,7 +129,7 @@ if ( $prevruns === false || !count( $prevruns ) ) {
     ## get firsttimestep
 
     if ( !file_exists( "charmm-gui/namd/$ifile.inp" ) ) {
-        echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+        echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading or processing.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
         exit;
     }
 
@@ -163,6 +153,36 @@ if ( $prevruns === false || !count( $prevruns ) ) {
     }
     $lastrun = preg_replace( '/^run\s+/', '', array_values($matches)[0] );
     $firsttimestep += $lastrun;
+}
+
+if ( file_exists( "charmm-gui/namd/$ofile.dcd" ) ) {
+    $response =
+        json_decode(
+            $ga->tcpquestion(
+                [
+                 "id"           => "q1"
+                 ,"title"       => "<h5>Project '$input->_project' has previous production results <i>$ofile</i></h5>"
+                 ,"icon"        => "warning.png"
+                 ,"text"        => ""
+                 ,"timeouttext" => "The time to respond has expired, please submit again."
+                 ,"buttons"     => [ "Erase previous results", "Cancel" ]
+                 ,"fields" => [
+                     [
+                      "id"          => "l1"
+                      ,"type"       => "label"
+                      ,"label"      => "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Previous results will be overwritten!"
+                      ,"align"      => "center"
+                     ]
+                 ]
+                ]
+
+            )
+        );
+
+    if ( $response->_response->button == "cancel" ) {
+        echo '{"_message":{"icon":"information.png","text":"Canceled"}}';
+        exit;
+    }
 }
 
 $ga->tcpmessage( [ "_textarea" => "Starting from prior run: $ifile.*\nNext results will be in: $ofile.*\nStarting time step     : $firsttimestep\n" ] );
@@ -281,7 +301,7 @@ if ( !file_exists( $namd3 ) ) {
 
 ## create the command
 
-$cmd = "cd charmm-gui/namd && $timeout $namd3 +idlepoll +p1 +devices 0 $ofile.inp 2> $ofile.stderr > $ofile.stdout";
+$cmd = "umask 002 && cd charmm-gui/namd && $timeout $namd3 +idlepoll +p1 +devices 0 $ofile.inp 2> $ofile.stderr > $ofile.stdout";
 $ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
 
 ## ready to run, fork & execute cmd in child
@@ -395,6 +415,7 @@ if ( file_exists( "charmm-gui/namd/$ofile.dcd" ) ) {
     }
 } else {
     $ga->tcpmessage( [ "_textarea" => "Notice: No final dcd file found so no pdb will be created for visualization\n" ] );
+    $errors = true;
 }    
 
 ## tar gz output
@@ -440,7 +461,24 @@ $output->_textarea = "";
 $output->_textarea .= "JSON input to executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
 # $output->_textarea .= "Command:\n$cmd\n";
 
-$output->_textarea .= "\nEQUILBRATION complete\n";
+$output->_textarea .= "\nPRODUCTION complete\n";
+
+## update state
+
+if ( !$errors ) {
+    $cgstate->state->lastoutput = $ofile;
+    if ( isset( $input->lastoutput ) ) {
+        $output->{'sparams-lastoutput'} = $ofile;
+    }
+    if ( isset( $input->description ) ) {
+        $cgstate->state->description    = $input->description;
+    }
+
+    if ( !$cgstate->save() ) {
+        echo '{"_message":{"icon":"toast.png","text":"Save state failed:' . $cgstate->errors . '"}}';
+        exit;
+    }
+}
 
 echo json_encode( $output );
 
