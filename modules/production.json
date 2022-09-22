@@ -72,6 +72,18 @@
         }
         ,{
             "role"       : "output"
+            ,"id"        : "gpustats"
+            ,"type"      : "html"
+            ,"label"     : "GPU usage"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "timing"
+            ,"type"      : "html"
+            ,"label"     : "NAMD timing"
+        }
+        ,{
+            "role"       : "output"
             ,"id"        : "inputlink"
             ,"label"     : "NAMD input"
             ,"type"      : "file"
@@ -97,18 +109,6 @@
             ,"label"     : "Archive of produced files"
             ,"type"      : "file"
             ,"help"      : "tar.gz format. Does not include DCD which is already compressed"
-        }
-        ,{
-            "role"       : "output"
-            ,"id"        : "gpustats"
-            ,"type"      : "html"
-            ,"label"     : "GPU usage"
-        }
-        ,{
-            "role"       : "output"
-            ,"id"        : "timing"
-            ,"type"      : "html"
-            ,"label"     : "Last timing"
         }
         ,{
             "role"       : "output"
