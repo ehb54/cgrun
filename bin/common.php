@@ -72,6 +72,10 @@ function error_exit( $msg ) {
     exit;
 }
 
+function tf_str( $flag ) {
+    return $flag ? "true" : "false";
+}
+
 ## test
 
 /*
