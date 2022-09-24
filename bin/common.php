@@ -41,6 +41,37 @@ class cgrun_state {
     }
 }
 
+## messages
+
+$msg_admin = "<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab.";
+
+
+## utility functions
+
+function mkdir_if_needed( $dir ) {
+    if ( is_dir( $dir ) ) {
+        return true;
+    }
+    mkdir( $dir, 0770 );
+    return is_dir( $dir );
+}
+
+function run_cmd( $cmd, $exit_if_error = true, $array_result = false ) {
+    exec( "$cmd 2>&1", $res, $res_code );
+    if ( $exit_if_error && $res_code ) {
+        error_exit( "shell command [$cmd] returned result:<br>" . implode( "<br> ", $res ) . "<br>and with exit status '$res_code'" );
+    }
+    if ( !$array_result ) {
+        return implode( "\n", $res ) . "\n";
+    }
+    return $res;
+}
+
+function error_exit( $msg ) {
+    echo '{"_message":{"icon":"toast.png","text":"' . $msg . '"}}';
+    exit;
+}
+
 ## test
 
 /*
