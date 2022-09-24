@@ -13,5 +13,13 @@
             ,"prehline"  : "true"
             ,"posthline" : "true"
         }
+        ,{
+            "role"       : "input"
+            ,"id"        : "cocsteps"
+            ,"label"     : "Center of coordinates minimizaton steps"
+            ,"type"      : "integer"
+            ,"min"       : 2
+            ,"default"   : 10
+        }
     ]
 }

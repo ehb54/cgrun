@@ -1,7 +1,9 @@
 #!/usr/local/bin/php
 <?php
 
-$self = __FILE__;
+$self   = __FILE__;
+$selfd  = dirname( $self );
+$cgbase = "charmm-gui/namd";
 
 if ( count( $argv ) != 2 ) {
     echo '{"error":"$self requires a JSON input object"}';
@@ -19,7 +21,97 @@ if ( !$input ) {
 
 $output = (object)[];
 
+include "genapp.php";
+include "datetime.php";
+
+$ga = new GenApp( $input, $output );
+$fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
+
 ## process inputs here to produce output
+
+## get state
+
+require "common.php";
+$cgstate = new cgrun_state();
+
+## make sure "loaded"
+
+## is this a proper project that has been "load"'d
+
+if ( !$cgstate->state->loaded ) {
+    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for equilibration,<br>Did you <i>load</i> it yet?<br>You can change projects in user configuration (top right)"}}';
+    exit;
+}
+
+## are the expected directories present?
+if ( !is_dir( $cgbase ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"The directory <i>$cgbase</i> does not exist. You will need to run <i>Load</i> again"}}';
+    exit;
+}
+ 
+### are the needeed dependencies present
+$dependencies =
+    [
+     "$cgbase/step3_input.pdb"
+     ,"$cgbase/step3_input.psf"
+    ];
+
+foreach ( $dependencies as $v ) {
+    if ( !file_exists( $v ) ) {
+        echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is missing expected file <i>$v</i>.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.$msg_admin"}}';
+    }
+}
+
+## build prep files as in cg_namd_setup.pl
+
+$mdutils = "$selfd/mdutil";
+
+
+### let's keep directories as in cg_namd_setup.pl for now, perhaps change later
+
+$vacuumd  = "$cgbase/vacuumd";
+$solmind  = "$cgbase/solmin";
+
+if ( !mkdir_if_needed( $vacuumd ) ) {
+    error_exit( "The directory <i>$vacuumd</i> could not be created.$msg_admin" );
+    exit;
+}
+
+if ( !mkdir_if_needed( $solmind ) ) {
+    error_exit( "The directory <i>$solmind</i> could not be created.$msg_admin" );
+}
+
+$cmds = [
+    "cd $vacuumd && cp ../step3_input.pdb ."
+    ,"cd $vacuumd && cp ../step3_input.psf ."
+    ,"cd $vacuumd && $mdutils/pdbcutwi.pl step3_input.pdb"
+    ,"cd $vacuumd && $mdutils/somopdb.pl step3_input.pdb"
+## TODO only if $refpdb defined
+#    ,"cd $vacuumd && $mdutils/pdbhelixsheet.pl step3_input.somo.pdb $refpdb"
+    ,"cd $vacuumd && $mdutils/restraints.pl step3_input.somo.pdb"
+    ,"cd $vacuumd && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocsteps"
+## TODO need maxatom computation
+#    ,"cd $vacuumd && $mdutils/psfcut.pl step3_input.psf $maxatom"
+    ,"cd $solmind && cp ../step3_input.pdb ."
+    ,"cd $solmind && cp ../step3_input.psf ."
+    ,"cd $solmind && $mdutils/somopdb.pl step3_input.pdb"
+## TODO only if $refpdb defined
+#    ,"cd $solmind && $mdutils/pdbhelixsheet.pl step3_input.somo.pdb $refpdb"
+    ,"cd $solmind && $mdutils/restraints.pl step3_input.somo.pdb"
+    ,"cd $solmind && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocsteps"
+    ];
+
+foreach ( $cmds as $cmd ) {
+    $ga->tcpmessage( [ "_textarea" => "Running: $cmd\n" ] );
+    $res = run_cmd( $cmd );
+    $ga->tcpmessage( [ "_textarea" => "Output:\n$res\n" ] );
+}
+
+$cgstate->state->vacuum_ready = true;
+$cgstate->state->solmin_ready = true;
+if ( !$cgstate->save() ) {
+    error_exit( "Save state failed:' . $cgstate->errors . '");
+}
 
 ## log results to textarea
 
