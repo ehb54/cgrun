@@ -81,25 +81,53 @@ if ( !mkdir_if_needed( $solmind ) ) {
     error_exit( "The directory <i>$solmind</i> could not be created.$msg_admin" );
 }
 
-$cmds = [
-    "cd $vacuumd && cp ../step3_input.pdb ."
-    ,"cd $vacuumd && cp ../step3_input.psf ."
-    ,"cd $vacuumd && $mdutils/pdbcutwi.pl step3_input.pdb"
-    ,"cd $vacuumd && $mdutils/somopdb.pl step3_input.pdb"
-## TODO only if $refpdb defined
-#    ,"cd $vacuumd && $mdutils/pdbhelixsheet.pl step3_input.somo.pdb $refpdb"
-    ,"cd $vacuumd && $mdutils/restraints.pl step3_input.somo.pdb"
-    ,"cd $vacuumd && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocsteps"
+$refpdb_exists =
+    isset( $cgstate->state->refpdb )
+    && is_array( $cgstate->state->refpdb )
+    && count( $cgstate->state->refpdb )
+    ;
+            
+$cmds = [];
+
+foreach ( [
+              "cd $vacuumd && cp ../step3_input.pdb ."
+              ,"cd $vacuumd && cp ../step3_input.psf ."
+              ,"cd $vacuumd && $mdutils/pdbcutwi.pl step3_input.pdb"
+              ,"cd $vacuumd && $mdutils/somopdb.pl step3_input.pdb"
+    ] as $cmd ) {
+    $cmds[] = $cmd;
+}
+
+if ( $refpdb_exists ) {
+    $cmds[] = "cd $vacuumd && $mdutils/pdbhelixsheet.pl step3_input.somo.pdb " . $cgstate->state->refpdb[0];
+}
+
+foreach ( [
+              "cd $vacuumd && $mdutils/restraints.pl step3_input.somo.pdb"
+              ,"cd $vacuumd && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocsteps"
 ## TODO need maxatom computation
-#    ,"cd $vacuumd && $mdutils/psfcut.pl step3_input.psf $maxatom"
-    ,"cd $solmind && cp ../step3_input.pdb ."
-    ,"cd $solmind && cp ../step3_input.psf ."
-    ,"cd $solmind && $mdutils/somopdb.pl step3_input.pdb"
-## TODO only if $refpdb defined
-#    ,"cd $solmind && $mdutils/pdbhelixsheet.pl step3_input.somo.pdb $refpdb"
-    ,"cd $solmind && $mdutils/restraints.pl step3_input.somo.pdb"
-    ,"cd $solmind && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocsteps"
-    ];
+#                ,"cd $vacuumd && $mdutils/psfcut.pl step3_input.psf $maxatom"
+              ,"cd $solmind && cp ../step3_input.pdb ."
+              ,"cd $solmind && cp ../step3_input.psf ."
+              ,"cd $solmind && $mdutils/somopdb.pl step3_input.pdb"
+          ] as $cmd ) {
+    $cmds[] = $cmd;
+}    
+
+if ( $refpdb_exists ) {
+    $cmds[] = "cd $solmind && $mdutils/pdbhelixsheet.pl step3_input.somo.pdb " . $cgstate->state->refpdb[0];
+}
+    
+foreach( [
+             "cd $solmind && $mdutils/restraints.pl step3_input.somo.pdb"
+             ,"cd $solmind && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocsteps"
+         ] as $cmd ) {
+    $cmds[] = $cmd;
+}    
+
+
+## $ga->tcpmessage( [ "_textarea" => "cmds:\n" . implode( "\n", $cmds ) . "\n" ] );
+
 
 foreach ( $cmds as $cmd ) {
     $ga->tcpmessage( [ "_textarea" => "Running: $cmd\n" ] );
