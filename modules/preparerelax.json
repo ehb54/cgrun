@@ -15,11 +15,43 @@
         }
         ,{
             "role"       : "input"
-            ,"id"        : "cocsteps"
-            ,"label"     : "Center of coordinates minimizaton steps"
+            ,"id"        : "cocrounds"
+            ,"label"     : "Center of coordinates minimizaton rounds"
             ,"type"      : "integer"
             ,"min"       : 2
             ,"default"   : 10
+        }
+        ,{
+            "role"       : "input"
+            ,"id"        : "minsteps_solv"
+            ,"label"     : "Solvent minimization steps"
+            ,"type"      : "integer"
+            ,"min"       : 1000
+            ,"default"   : 20000
+        }
+        ,{
+            "role"       : "input"
+            ,"id"        : "minsteps_carb"
+            ,"label"     : "Carb [if present] minimization steps"
+            ,"type"      : "integer"
+            ,"min"       : 1000
+            ,"default"   : 20000
+        }
+        ,{
+            "role"       : "input"
+            ,"id"        : "minsteps_coci"
+            ,"label"     : "Center of coordinate intermediate minimization steps"
+            ,"type"      : "integer"
+            ,"min"       : 1000
+            ,"default"   : 10000
+        }
+        ,{
+            "role"       : "input"
+            ,"id"        : "minsteps_final"
+            ,"label"     : "Final minimization steps"
+            ,"type"      : "integer"
+            ,"min"       : 1000
+            ,"default"   : 20000
         }
     ]
 }

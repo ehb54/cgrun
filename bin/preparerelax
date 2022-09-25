@@ -20,6 +20,7 @@ if ( !$input ) {
 }
 
 $output = (object)[];
+$output->_textarea = "";
 
 include "genapp.php";
 include "datetime.php";
@@ -54,18 +55,28 @@ $dependencies =
     [
      "$cgbase/step3_input.pdb"
      ,"$cgbase/step3_input.psf"
+     ,"$cgbase/../step3_pbcsetup.str"
     ];
 
 foreach ( $dependencies as $v ) {
     if ( !file_exists( $v ) ) {
-        echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is missing expected file <i>$v</i>.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.$msg_admin"}}';
+        error_exit( "The current project <i>$input->_project</i> is missing expected file <i>$v</i>.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.$msg_admin" );
     }
 }
+
+## get max non-solvent atoms
+
+$maxatoms = intval( run_cmd( "grep -P '^ATOM' $cgbase/step3_input.pdb | awk '{ print substr(\$0,73,4) \" \" substr(\$0,7,5) }'  | grep -Pv '^(IONS|SOLV)' | tail -1 | awk '{ print \$2 }'" ) );
+$ga->tcpmessage( [ "_textarea" => "Number of non solvent atoms: $maxatoms\n" ] );
+
+## get pcbsetup
+
+$pbcsetup = strtolower( run_cmd( "cd $cgbase && cat ../step3_pbcsetup.str | sed -e 's/ =//g'" ) );
+$ga->tcpmessage( [ "_textarea" => "pbcsetup:\n$pbcsetup\n" ] );
 
 ## build prep files as in cg_namd_setup.pl
 
 $mdutils = "$selfd/mdutil";
-
 
 ### let's keep directories as in cg_namd_setup.pl for now, perhaps change later
 
@@ -104,9 +115,8 @@ if ( $refpdb_exists ) {
 
 foreach ( [
               "cd $vacuumd && $mdutils/restraints.pl step3_input.somo.pdb"
-              ,"cd $vacuumd && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocsteps"
-## TODO need maxatom computation
-#                ,"cd $vacuumd && $mdutils/psfcut.pl step3_input.psf $maxatom"
+              ,"cd $vacuumd && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocrounds"
+              ,"cd $vacuumd && $mdutils/psfcut.pl step3_input.psf $maxatoms"
               ,"cd $solmind && cp ../step3_input.pdb ."
               ,"cd $solmind && cp ../step3_input.psf ."
               ,"cd $solmind && $mdutils/somopdb.pl step3_input.pdb"
@@ -120,7 +130,7 @@ if ( $refpdb_exists ) {
     
 foreach( [
              "cd $solmind && $mdutils/restraints.pl step3_input.somo.pdb"
-             ,"cd $solmind && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocsteps"
+             ,"cd $solmind && $mdutils/restraintscoc.pl step3_input.somo.pdb $input->cocrounds"
          ] as $cmd ) {
     $cmds[] = $cmd;
 }    
@@ -135,8 +145,14 @@ foreach ( $cmds as $cmd ) {
     $ga->tcpmessage( [ "_textarea" => "Output:\n$res\n" ] );
 }
 
+$output->_textarea .= "\nPREPARE complete\n";
+
+## save state
+
 $cgstate->state->vacuum_ready = true;
 $cgstate->state->solmin_ready = true;
+$cgstate->state->maxatoms     = $maxatoms;
+
 if ( !$cgstate->save() ) {
     error_exit( "Save state failed:' . $cgstate->errors . '");
 }
