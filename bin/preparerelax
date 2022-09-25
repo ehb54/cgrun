@@ -76,6 +76,75 @@ $ga->tcpmessage( [ "_textarea" => "pbcsetup:\n$pbcsetup\n" ] );
 
 ## build prep files as in cg_namd_setup.pl
 
+## all expected results, stage_inputs, stage_outputs
+$expected_results = [
+    "$cgbase/solmin/step3_input.somo_f_pa_c.pdb"
+    ,"$cgbase/solmin_000.inp"
+    ,"$cgbase/solmin/step3_input.somo_f_pa.pdb"
+    ,"$cgbase/solmin_001.inp"
+    ,"$cgbase/solmin/step3_input.somo_f_pbba_coc_000.pdb"
+    ,"$cgbase/solmin_002.inp"
+    ];
+
+## solmin specific
+
+$solmin_inputs = [
+    "step3_input.pdb"
+    ,"output/min1_f_pa_c.coor"
+    ,"output/min1_f_pa.coor"
+    ];
+    
+$solmin_outputs = [
+    "output/min1_f_pa_c"
+    ,"output/min1_f_pa"
+    ,"output/min1_f_pbba_coc_000"
+    ];
+
+$solmin_jobs = [
+    "solmin_000.inp"
+    ,"solmin_001.inp"
+    ,"solmin_002.inp"
+    ];
+
+$solmin_minimization_steps = [
+    $input->minsteps_solv
+    ,$input->minsteps_carb
+    ,$input->minsteps_coci
+    ];
+
+$solmin_firsttimesteps = [
+    0
+    ,$input->minsteps_solv
+    ,$input->minsteps_carb + $input->minsteps_solv
+    ];
+
+for ( $i = 1; $i < $input->cocrounds; ++$i ) {
+    foreach ( [
+                  sprintf( "$cgbase/solmin/step3_input.somo_f_pbba_coc_%s.pdb", str_pad( $i, 3, '0', STR_PAD_LEFT ) )
+                  ,sprintf( "$cgbase/solmin_%s.inp", str_pad( $i + 2, 3, '0', STR_PAD_LEFT ) )
+              ] as $expected_result ) {
+        $expected_results[] = $expected_result;
+    }
+    $solmin_inputs[]             = sprintf( "output/min1_f_pbba_coc_%s.coor", str_pad( $i, 3, '0', STR_PAD_LEFT ) );
+    $solmin_outputs[]            = sprintf( "output/min1_f_pbba_coc_%s", str_pad( $i + 1, 3, '0', STR_PAD_LEFT ) );
+    $solmin_jobs[]               = sprintf( "solmin_%s", str_pad( $i + 2, 3, '0', STR_PAD_LEFT ) );
+    $solmin_minimization_steps[] = $input->minsteps_coci;
+    $solmin_firsttimesteps[]     = end( $solmin_firsttimesteps ) + $input->minsteps_coci;
+}
+
+## fix up final solmin steps
+$solmin_minimization_steps[ array_key_last( $solmin_minimization_steps ) ] = $input->minsteps_final;
+
+$ga->tcpmessage( [ "_textarea" =>
+                   "expected_results:\n" . implode( "\n", $expected_results ) . "\n"
+                   . "solmin_inputs:\n" . implode( "\n", $solmin_inputs ) . "\n"
+                   . "solmin_outputs:\n" . implode( "\n", $solmin_outputs ) . "\n"
+                   . "solmin_jobs:\n" . implode( "\n", $solmin_jobs ) . "\n"
+                   . "solmin_minimization_steps:\n" . implode( "\n", $solmin_minimization_steps ) . "\n"
+                   . "solmin_firsttimesteps:\n" . implode( "\n", $solmin_firsttimesteps ) . "\n"
+                 ] );
+
+
 $mdutils = "$selfd/mdutil";
 
 ### let's keep directories as in cg_namd_setup.pl for now, perhaps change later
@@ -145,6 +214,20 @@ foreach ( $cmds as $cmd ) {
     $ga->tcpmessage( [ "_textarea" => "Output:\n$res\n" ] );
 }
 
+## verify expected results
+
+
+$missing_results = [];
+foreach ( $expected_results as $expected_result ) {
+    if ( !file_exists( $expected_result ) ) {
+        $missing_results[] = $expected_result;
+    }
+}
+
+if ( count( $missing_results ) ) {
+    error_exit( "There is some error, the following files were expected to be produced but were not found:<br>" . implode( "<br>", $missing_results ) );
+}
+
 $output->_textarea .= "\nPREPARE complete\n";
 
 ## save state
@@ -152,6 +235,7 @@ $output->_textarea .= "\nPREPARE complete\n";
 $cgstate->state->vacuum_ready = true;
 $cgstate->state->solmin_ready = true;
 $cgstate->state->maxatoms     = $maxatoms;
+$cgstate->state->solmin_jobs  = $solmin_jobs;
 
 if ( !$cgstate->save() ) {
     error_exit( "Save state failed:' . $cgstate->errors . '");
