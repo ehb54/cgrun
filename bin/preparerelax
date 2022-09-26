@@ -55,6 +55,7 @@ $dependencies =
     [
      "$cgbase/step3_input.pdb"
      ,"$cgbase/step3_input.psf"
+     ,"$cgbase/step4_equilibration.inp"
      ,"$cgbase/../step3_pbcsetup.str"
     ];
 
@@ -100,6 +101,12 @@ $solmin_outputs = [
     ,"output/min1_f_pbba_coc_000"
     ];
 
+$solmin_faf = [
+    "output/step3_input.somo_f_pa_c.pdb"
+    ,"output/step3_input.somo_f_pa.pdb"
+    ,"output/step3_input.somo_f_pbba_coc_000.pdb"
+    ];
+
 $solmin_jobs = [
     "solmin_000.inp"
     ,"solmin_001.inp"
@@ -127,7 +134,8 @@ for ( $i = 1; $i < $input->cocrounds; ++$i ) {
     }
     $solmin_inputs[]             = sprintf( "output/min1_f_pbba_coc_%s.coor", str_pad( $i, 3, '0', STR_PAD_LEFT ) );
     $solmin_outputs[]            = sprintf( "output/min1_f_pbba_coc_%s", str_pad( $i + 1, 3, '0', STR_PAD_LEFT ) );
-    $solmin_jobs[]               = sprintf( "solmin_%s", str_pad( $i + 2, 3, '0', STR_PAD_LEFT ) );
+    $solmin_faf[]                = sprintf( "output/step3_input.somo_f_pbba_coc_%s.pdb", str_pad( $i + 1, 3, '0', STR_PAD_LEFT ) );
+    $solmin_jobs[]               = sprintf( "solmin_%s.inp", str_pad( $i + 2, 3, '0', STR_PAD_LEFT ) );
     $solmin_minimization_steps[] = $input->minsteps_coci;
     $solmin_firsttimesteps[]     = end( $solmin_firsttimesteps ) + $input->minsteps_coci;
 }
@@ -139,11 +147,11 @@ $ga->tcpmessage( [ "_textarea" =>
                    "expected_results:\n" . implode( "\n", $expected_results ) . "\n"
                    . "solmin_inputs:\n" . implode( "\n", $solmin_inputs ) . "\n"
                    . "solmin_outputs:\n" . implode( "\n", $solmin_outputs ) . "\n"
+                   . "solmin_faf:\n" . implode( "\n", $solmin_faf ) . "\n"
                    . "solmin_jobs:\n" . implode( "\n", $solmin_jobs ) . "\n"
                    . "solmin_minimization_steps:\n" . implode( "\n", $solmin_minimization_steps ) . "\n"
                    . "solmin_firsttimesteps:\n" . implode( "\n", $solmin_firsttimesteps ) . "\n"
                  ] );
-
 
 $mdutils = "$selfd/mdutil";
 
@@ -207,15 +215,77 @@ foreach( [
 
 ## $ga->tcpmessage( [ "_textarea" => "cmds:\n" . implode( "\n", $cmds ) . "\n" ] );
 
-
 foreach ( $cmds as $cmd ) {
     $ga->tcpmessage( [ "_textarea" => "Running: $cmd\n" ] );
     $res = run_cmd( $cmd );
     $ga->tcpmessage( [ "_textarea" => "Output:\n$res\n" ] );
 }
 
-## verify expected results
+## make inp files
 
+$inplines = explode( "\n", file_get_contents( "$cgbase/step4_equilibration.inp" ) );
+
+$inpnew = preg_replace(
+    [
+     '/^((constraints|consexp|consref|conskfile|conskcol|minimize|numsteps|run|set outputname|outputName).*)$/i'
+     ,'/^coordinates.*$/i'
+     ,'/^firsttimestep.*$/i'
+    ],
+    [
+     "# $0"
+     ,"coordinates             __input_name__"
+     ,"firsttimestep           __firsttimestep__;"
+    ]
+    ,$inplines
+    );
+if ( count( $inplines ) != count( $inpnew ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"Error replacing values in input script<br>Try <i>load</i> again.$msg_admin"}}';
+    exit;
+}
+
+foreach ( [
+              "# fixed atoms"
+              ,"# restraints"
+              ,"fixedAtoms              on"
+              ,"fixedAtomsForces        on"
+              ,"fixedAtomsFile          __fixed_atoms_file__"
+              ,"fixedAtomsCol           B"
+              ,""
+              ,"# output"
+              ,"outputname              __output_name__"
+              ,"binaryoutput            no"
+              ,""
+              ,"# run control"
+              ,""
+              ,"minimize                __minimize_steps__"
+          ] as $addline ) {
+    $inpnew[] = $addline;
+}
+
+for ( $i = 0; $i < count( $solmin_jobs ); ++$i ) {
+    $inpoutput = preg_replace(
+        [
+         "/__input_name__/"
+         ,"/__firsttimestep__/"
+         ,"/__fixed_atoms_file__/"
+         ,"/__output_name__/"
+         ,"/__minimize_steps__/"
+        ]
+        ,
+        [
+         $solmin_inputs[$i]
+         ,$solmin_firsttimesteps[$i]
+         ,$solmin_faf[$i]
+         ,$solmin_outputs[$i]
+         ,$solmin_minimization_steps[$i]
+        ]
+        ,$inpnew
+        );
+    file_put_contents( "$cgbase/$solmin_jobs[$i]", implode( "\n", $inpoutput ) . "\n" );
+    chmod( "$cgbase/$solmin_jobs[$i]", 0660 );
+}
+
+## verify expected results
 
 $missing_results = [];
 foreach ( $expected_results as $expected_result ) {
