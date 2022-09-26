@@ -65,6 +65,43 @@ foreach ( $dependencies as $v ) {
     }
 }
 
+## check if already run
+## could add additional file checks - but probably not needed - the state variable should be sufficient
+if ( isset( $cgstate->state->preparerelax ) && $cgstate->state->preparerelax ) {
+    $response =
+        json_decode(
+            $ga->tcpquestion(
+                [
+                 "id"           => "q1"
+                 ,"title"       => "<h5>Project '$input->_project' has previous equilibration results</h5>"
+                 ,"icon"        => "warning.png"
+                 ,"text"        => ""
+                 ,"timeouttext" => "The time to respond has expired, please submit again."
+                 ,"buttons"     => [ "Erase previous results", "Cancel" ]
+                 ,"fields" => [
+                     [
+                      "id"          => "l1"
+                      ,"type"       => "label"
+                      ,"label"      => "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Previous results will be overwritten!"
+                      ,"align"      => "center"
+                     ]
+                 ]
+                ]
+
+            )
+        );
+
+    if ( $response->_response->button == "cancel" ) {
+        echo '{"_message":{"icon":"information.png","text":"Canceled"}}';
+        exit;
+    }
+}
+
+unset( $cgstate->state->preparerelax );
+if ( !$cgstate->save() ) {
+    error_exit( "Save state failed:' . $cgstate->errors . '");
+}
+
 ## get max non-solvent atoms
 
 $maxatoms = intval( run_cmd( "grep -P '^ATOM' $cgbase/step3_input.pdb | awk '{ print substr(\$0,73,4) \" \" substr(\$0,7,5) }'  | grep -Pv '^(IONS|SOLV)' | tail -1 | awk '{ print \$2 }'" ) );
@@ -215,10 +252,15 @@ foreach( [
 
 ## $ga->tcpmessage( [ "_textarea" => "cmds:\n" . implode( "\n", $cmds ) . "\n" ] );
 
+$step = 0;
+
 foreach ( $cmds as $cmd ) {
     $ga->tcpmessage( [ "_textarea" => "Running: $cmd\n" ] );
     $res = run_cmd( $cmd );
-    $ga->tcpmessage( [ "_textarea" => "Output:\n$res\n" ] );
+    $ga->tcpmessage( [
+                         "_textarea" => "Output:\n$res\n"
+                         ,"_progress" => ++$step / count( $cmds )
+                     ]);
 }
 
 ## make inp files
@@ -302,10 +344,12 @@ $output->_textarea .= "\nPREPARE complete\n";
 
 ## save state
 
-$cgstate->state->vacuum_ready = true;
-$cgstate->state->solmin_ready = true;
-$cgstate->state->maxatoms     = $maxatoms;
-$cgstate->state->solmin_jobs  = $solmin_jobs;
+$cgstate->state->preparerelax               = true;
+$cgstate->state->vacuum_ready               = false;
+$cgstate->state->solmin_ready               = true;
+$cgstate->state->maxatoms                   = $maxatoms;
+$cgstate->state->solmin_jobs                = $solmin_jobs;
+$cgstate->state->solmin_minimization_steps  = $solmin_minimization_steps;
 
 if ( !$cgstate->save() ) {
     error_exit( "Save state failed:' . $cgstate->errors . '");
