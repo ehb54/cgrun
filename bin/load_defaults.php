@@ -5,7 +5,7 @@
 $request = json_decode( file_get_contents( "php://stdin" ) );
 $result  = (object)[];
 
-function error_exit( $msg ) {
+function defaults_error_exit( $msg ) {
     global $result;
     $result->_error = $msg;
     echo json_encode( $result );
@@ -13,7 +13,7 @@ function error_exit( $msg ) {
 }
 
 if ( $request === NULL ) {
-    error_exit( "Invalid JSON input provided" );
+    defaults_error_exit( "Invalid JSON input provided" );
 }
 
 if ( $request->_filedata ) {
