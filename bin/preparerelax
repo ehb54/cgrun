@@ -102,6 +102,8 @@ if ( !$cgstate->save() ) {
     error_exit( "Save state failed:' . $cgstate->errors . '");
 }
 
+run_cmd( "cd $cgbase && rm -fr solmin_???.inp solmin", false );
+
 ## get max non-solvent atoms
 
 $maxatoms = intval( run_cmd( "grep -P '^ATOM' $cgbase/step3_input.pdb | awk '{ print substr(\$0,73,4) \" \" substr(\$0,7,5) }'  | grep -Pv '^(IONS|SOLV)' | tail -1 | awk '{ print \$2 }'" ) );
@@ -164,14 +166,14 @@ $solmin_firsttimesteps = [
 
 for ( $i = 1; $i < $input->cocrounds; ++$i ) {
     foreach ( [
-                  sprintf( "$cgbase/solmin/step3_input.somo_f_pbba_coc_%s.pdb", str_pad( $i, 3, '0', STR_PAD_LEFT ) )
-                  ,sprintf( "$cgbase/solmin_%s.inp", str_pad( $i + 2, 3, '0', STR_PAD_LEFT ) )
+                  sprintf( "$cgbase/solmin/step3_input.somo_f_pbba_coc_%s.pdb", str_pad( $i - 1, 3, '0', STR_PAD_LEFT ) )
+                  ,sprintf( "$cgbase/solmin_%s.inp", str_pad( $i + 1, 3, '0', STR_PAD_LEFT ) )
               ] as $expected_result ) {
         $expected_results[] = $expected_result;
     }
-    $solmin_inputs[]             = sprintf( "solmin/min1_f_pbba_coc_%s.coor", str_pad( $i, 3, '0', STR_PAD_LEFT ) );
-    $solmin_outputs[]            = sprintf( "solmin/min1_f_pbba_coc_%s", str_pad( $i + 1, 3, '0', STR_PAD_LEFT ) );
-    $solmin_faf[]                = sprintf( "solmin/step3_input.somo_f_pbba_coc_%s.pdb", str_pad( $i + 1, 3, '0', STR_PAD_LEFT ) );
+    $solmin_inputs[]             = sprintf( "solmin/min1_f_pbba_coc_%s.coor", str_pad( $i - 1, 3, '0', STR_PAD_LEFT ) );
+    $solmin_outputs[]            = sprintf( "solmin/min1_f_pbba_coc_%s", str_pad( $i, 3, '0', STR_PAD_LEFT ) );
+    $solmin_faf[]                = sprintf( "solmin/step3_input.somo_f_pbba_coc_%s.pdb", str_pad( $i, 3, '0', STR_PAD_LEFT ) );
     $solmin_jobs[]               = sprintf( "solmin_%s.inp", str_pad( $i + 2, 3, '0', STR_PAD_LEFT ) );
     $solmin_minimization_steps[] = $input->minsteps_coci;
     $solmin_firsttimesteps[]     = end( $solmin_firsttimesteps ) + $input->minsteps_coci;
