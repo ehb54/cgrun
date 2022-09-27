@@ -3,7 +3,7 @@
     ,"label"      : "Run"
     ,"help"       : "Run advanced relaxation"
     ,"executable" : "runrelax"
-#    ,"resource"   : "oscluster"
+    ,"resource"   : "oscluster"
     ,"fields"   : [
         {
             "role"       : "input"

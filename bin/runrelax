@@ -1,6 +1,34 @@
 #!/usr/local/bin/php
 <?php
 
+### user configuration
+
+$cgbase = "charmm-gui/namd";
+
+#### the namd executable for this
+$namd2          = __DIR__ . "/namd/NAMD_2.14_Linux-x86_64-multicore/namd2";
+
+#### the CHARMM-gui generated base file name ".inp" extension is assumed and not provided here
+
+$rfile          = "step5_production";      # reference for creating inp
+
+####  number seconds between checking to see if the NAMD process is still running
+$poll_interval_seconds = 5;
+
+####  frequency of actual UI updates, multiply this by the $poll_interval_seconds to determine actual user update time
+$poll_update_freq      = 1;
+
+### end user configuration
+
+### developer configuration
+
+$timeout = "";
+
+#### for debugging
+## $timeout = "timeout 60";
+
+### end developer configuration
+
 $self = __FILE__;
 
 if ( count( $argv ) != 2 ) {
@@ -19,11 +47,363 @@ if ( !$input ) {
 
 $output = (object)[];
 
+include "genapp.php";
+include "datetime.php";
+
+$ga = new GenApp( $input, $output );
+$fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
+
+## get state
+
+require "common.php";
+$cgstate = new cgrun_state();
+
+## check for previous run
+
+if ( !$cgstate->state->preparerelax ) {
+    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not to run advanced relaxation,<br>Did you run <i>prepare</i> yet?<br>You can change projects in user configuration (top right)"}}';
+    exit;
+}
+
 ## process inputs here to produce output
 
-## log results to textarea
+if ( !isset( $input->os_flavor ) ) {
+    error_exit( "Internal error: <i>os_flavor</i> not defined.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab" );
+}
 
-$output->{'_textarea'} = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
-$output->{'_textarea'} .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
+if ( !file_exists( __DIR__ . "/../appconfig.json" ) ) {
+    error_exit( "Internal error: <i>appconfig.json</i> not found.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab" );
+}
+
+$appconfig = json_decode( file_get_contents(  __DIR__ . "/../appconfig.json" ) );
+if ( !isset( $appconfig->resources )
+     || !isset( $appconfig->resources->oscluster )
+     || !isset( $appconfig->resources->oscluster->properties )
+     || !isset( $appconfig->resources->oscluster->properties->flavors ) ) {
+    error_exit( "Internal error: <i>appconfig.json</i> missing <i>resources:oscluster:properties:flavors</i>.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab" );
+}
+
+if ( !array_key_exists( str_replace( "_", ".", $input->os_flavor ), $appconfig->resources->oscluster->properties->flavors ) ) {
+    error_exit( 'Internal error: flavor <i>' . str_replace( "_", ".", $input->os_flavor ) . '</i> missing resources:oscluster:properties:flavors.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab' );
+}
+
+$cores = $appconfig->resources->oscluster->properties->flavors->{ str_replace( "_", ".", $input->os_flavor ) };
+
+## check for expected files
+
+if ( !file_exists( $namd2 ) ) {
+    error_exit( "Internal error: <i>' . $namd2 . '</i> does not exist.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab" );
+}
+
+## are the expected directories present?
+if ( !is_dir( "charmm-gui/namd" ) ) {
+    error_exit( "The directory <i>charmm-gui/namd</i> does not exist. You will need to run <i>Load</i> again" );
+}
+
+if ( !isset( $cgstate->state->solmin_jobs ) || !count( $cgstate->state->solmin_jobs ) ) {
+    error_exit( "Unexpected state, no minimization jobs listed.$msg_admin" );
+}
+
+$missing_inps = [];
+foreach ( $cgstate->state->solmin_jobs_results as $solmin_job ) {
+    if ( !file_exists( "$cgbase/$solmin_job" ) ) {
+        $missing_inps[] = "$cgbase/$solmin_job";
+    }
+}
+
+if ( count( $missing_inps ) ) {
+    error_exit( "There is some error, the following files were expected to be present but were not found:<br>" . implode( "<br>", $missing_inps ) . $msg_admin );
+}
+
+## create the command
+$ofile = "multistage_minimization";
+
+$cmd = "umask 002 && cd charmm-gui/namd && ( echo -n";
+
+foreach ( $cgstate->state->solmin_jobs as $solmin_job ) {
+    $cmd .= " && $namd2 +idlepoll +p$cores $solmin_job";
+}
+$cmd .= " ) 2> $ofile.stderr > $ofile.stdout";
+
+$ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
+
+## ready to run, fork & execute cmd in child
+
+## testing
+# error_exit( "testing..." );
+
+$deletes = [ ".stdout", ".dcd", "_last.dcd", "_last.pdb", "_last_dry.pdb", "_results.tgz" ];
+
+foreach ( $deletes as $v ) {
+    if ( file_exists( "charmm-gui/namd/$ofile$v" ) ) {
+        unlink( "charmm-gui/namd/$ofile$v" );
+    }
+}
+
+# $ga->tcpmessage( [ "inputlink" => "$fdir/charmm-gui/namd/$ofile.inp" ] );
+
+## fork ... child will exec
+
+$pid = pcntl_fork();
+if ( $pid == -1 ) {
+    error_exit( "Unable to fork process.<br>This should not happen.<br>Please contact the administrators via the <i>Feedback</i> tab" );
+}
+
+## prepare to run
+
+$errors = false;
+
+if ( $pid ) {
+    ## parent
+    init_ui();
+    $updatenumber = 0;
+    while ( file_exists( "/proc/$pid/stat" ) ) {
+        ## is Z/defunct ?
+        $stat = file_get_contents( "/proc/$pid/stat" );
+        $stat_fields = explode( ' ', $stat );
+        if ( count( $stat_fields ) > 2 && $stat_fields[2] == "Z" ) {
+            break;
+        }
+        ## still running
+        if ( !( $updatenumber++ % $poll_update_freq ) ) {
+            ## update UI
+            # $ga->tcpmessage( [ "_textarea" => "update the UI $updatenumber - $pid\n" ] );
+            update_ui();
+        } else {
+            ## simply checking for job completion
+            # $ga->tcpmessage( [ "_textarea" => "polling update $updatenumber - $pid\n" ] );
+        }
+        sleep( $poll_interval_seconds );
+    } 
+    ## get exit status from /proc/$pid
+    pcntl_waitpid( $pid, $status );
+    ## namd returns status zero even if it fails :(
+    ## $ga->tcpmessage( [ "_textarea" => sprintf( "exit status %s\n", pcntl_wexitstatus( $status ) ) ] );
+    if ( file_exists( "charmm-gui/namd/${ofile}.stderr" ) && filesize( "charmm-gui/namd/${ofile}.stderr" ) ) {
+        $ga->tcpmessage( [ "_textarea" => "NAMD errors:\n----\n" . file_get_contents( "charmm-gui/namd/${ofile}.stderr" ) . "\n----\n" ] );
+        $errors = true;
+    }
+    update_ui();
+} else {
+    ## child
+    ob_start();
+    $ga->tcpmessage( [ "_textarea" => "\nProduction job starting\n" ] );
+    $ga->tcpmessage( [ "stdoutlink" => "$fdir/charmm-gui/namd/$ofile.stdout" ] );
+    $time_start = dt_now();
+    shell_exec( $cmd );
+    $time_end   = dt_now();
+    $ga->tcpmessage( [ "_textarea" =>
+                       "\nProduction job ending\n"
+                       . "NAMD duration: " . dhms_from_minutes( dt_duration_minutes( $time_start, $time_end ) ) . "\n"
+                     ] );
+    ob_end_clean();
+    exit();
+}
+
+## assemble final output
+
+## TODO : decide what to do about multiple outputs and correspondingly update assembly below
+
+## dcd->pdb
+
+if ( file_exists( "charmm-gui/namd/$ofile.dcd" ) ) {
+    $cmd = "cd charmm-gui/namd && " . __DIR__ . "/util/catdcd -num $ofile.dcd | grep -P '^Total frames' | awk '{ print \$3 }'";
+    $lframe = intval( `$cmd 2>/dev/null` );
+    if ( $lframe > 1 ) {
+        # $ga->tcpmessage( [ "_textarea" => "checking for dcd to make pdb - lframe > 1\n" ] );
+        ## need 2 frames for mdconvert
+        $lframe--;
+        $cmd = "cd charmm-gui/namd && " . __DIR__ . "/util/catdcd  -first $lframe -o ${ofile}_last.dcd $ofile.dcd";
+        `$cmd 2>&1 > /dev/null`;
+        if ( file_exists( "charmm-gui/namd/${ofile}_last.dcd" ) ) {
+            $cmd = "cd charmm-gui/namd && mdconvert -f -o ${ofile}_last.pdb -t step3_input.pdb -i -1 ${ofile}_last.dcd";
+            `$cmd 2>&1 > /dev/null`;
+            if ( file_exists( "charmm-gui/namd/${ofile}_last.pdb" ) ) {
+                $cmd = "cd charmm-gui/namd && grep -Pv ' (HOH|POT POT|SOD  SOD|CLA  CLA) ' ${ofile}_last.pdb > ${ofile}_last_dry.pdb";
+                #$ga->tcpmessage( [ "_textarea" => "nowat cmd $cmd\n" ] );
+                `$cmd 2> /dev/null`;
+                if ( file_exists( "charmm-gui/namd/${ofile}_last_dry.pdb" ) ) {
+                    $output->pdblastdry = "$fdir/charmm-gui/namd/${ofile}_last_dry.pdb";
+                } else {
+                    $ga->tcpmessage( [ "_textarea" => "Notice: failed to extract solvent from pdb, so no pdb will be created for visualization\n" ] );
+                }
+            } else {
+                $ga->tcpmessage( [ "_textarea" => "Notice: mdconvert failed to create a pdb from the dcd, so no pdb will be created for visualization\n" ] );
+            }
+        } else {
+            $ga->tcpmessage( [ "_textarea" => "Notice: catdcd failed to extract frames from the dcd, so no pdb will be created for visualization\n" ] );
+        }
+    } else {
+        $ga->tcpmessage( [ "_textarea" => "Notice: final dcd has only one frame, so no pdb will be created for visualization\n" ] );
+    }
+} else {
+    $ga->tcpmessage( [ "_textarea" => "Notice: No final dcd file found so no pdb will be created for visualization\n" ] );
+    $errors = true;
+}    
+
+## tar gz output
+
+$tgzfiles = [
+    "$ofile.vel"
+    ,"$ofile.coor"
+    ,"$ofile.xsc"
+    ,"$ofile.xst"
+    ,"$ofile.stdout"
+    ,"$ofile.stderr"
+    ,"${ofile}_last.pdb"
+    ,"${ofile}_last_dry.pdb"
+    ];
+
+$cmd = "cd charmm-gui/namd && ls -1 " . implode( " ", $tgzfiles ) . " 2> /dev/null";
+exec( $cmd, $tgzfilesfound );
+$cmd = "cd charmm-gui/namd && tar -I pigz -cf ${ofile}_results.tgz " . implode( " ", $tgzfilesfound );
+`$cmd 2>&1 > /dev/null`;
+
+    
+update_ui( false );
+
+$output->inputlink  = "$fdir/charmm-gui/namd/$ofile.inp";
+if ( file_exists( "charmm-gui/namd/$ofile.dcd" ) ) {
+    $output->dcdlink    = "$fdir/charmm-gui/namd/$ofile.dcd";
+}
+$output->stdoutlink = "$fdir/charmm-gui/namd/$ofile.stdout";
+if ( file_exists( "charmm-gui/namd/${ofile}_results.tgz" ) ) {
+    $output->tgzlink    = "$fdir/charmm-gui/namd/${ofile}_results.tgz";
+}
+
+if ( file_exists( "charmm-gui/namd/$ofile.stdout" ) && filesize( "charmm-gui/namd/$ofile.stdout" ) > 0 ) {
+    $output->min_e_plot = $namd->min_e_plot;
+}
+
+$output->gpustats = $namd->gpustats->msg;
+
+$output->_textarea = "";
+
+#$output->_textarea .= "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
+$output->_textarea .= "JSON input to executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
+# $output->_textarea .= "Command:\n$cmd\n";
+
+$output->_textarea .= "\nPRODUCTION complete\n";
+
+## update state
+
+if ( !$errors ) {
+    $cgstate->state->lastoutput = $ofile;
+    if ( isset( $input->lastoutput ) ) {
+        $output->{'sparams-lastoutput'} = $ofile;
+    }
+    if ( isset( $input->description ) ) {
+        $cgstate->state->description    = $input->description;
+    }
+
+    if ( !$cgstate->save() ) {
+        error_exit( "Save state failed:' . $cgstate->errors . '" );
+    }
+}
 
 echo json_encode( $output );
+
+## ui bits should really be a class
+
+function init_ui() {
+    global $ofile;
+    global $namd;
+    global $ga;
+    global $cgstate;
+
+    $namd = (object)[];
+    
+    ## get total steps
+
+    $namd->min_steps = array_sum( array_map( 'intval', $cgstate->state->solmin_minimization_steps ) );
+
+    $namd->min_e_plot = json_decode(
+        '{
+            "data" : [
+                {
+                 "x"     : []
+                 ,"y"    : []
+                 ,"mode" : "lines"
+                 ,"line" : {
+                     "color"  : "rgb(150,150,222)"
+                     ,"width" : 2
+                  }
+                }
+             ]
+             ,"layout" : {
+                "title" : "Minimize TOTAL3"
+                ,"showlegend" : false
+                ,"font" : {
+                    "color"  : "rgb(0,0,0)"
+                }
+                ,"paper_bgcolor": "rgba(0,0,0,0)"
+                ,"plot_bgcolor": "rgba(0,0,0,0)"
+                ,"xaxis" : {
+                   "gridcolor" : "rgba(50,50,50,0.5)"
+                   ,"title" : {
+                   "text" : "Timestep"
+                    ,"gridcolor" : "rgb(50,50,50)"
+                    ,"font" : {
+                        "color"  : "rgb(50,50,50)"
+                    }
+                 }
+                }
+                ,"yaxis" : {
+                   "gridcolor" : "rgba(50,50,50,0.5)"
+                   ,"title" : {
+                   "text" : "TOTAL3"
+                    ,"font" : {
+                        "color"  : "rgb(50,50,50)"
+                    }
+                 }
+                }
+             }
+        }'
+        );
+
+    $namd->min_e_plot->layout->xaxis->range = [0, $namd->min_steps ];
+}
+
+function update_ui( $message = true ) {
+    global $ga;
+    global $ofile;
+    global $namd;
+
+    # $ga->tcpmessage( [ "_textarea" => "update_ui()\n" ] );
+
+    $cmd = "grep -P '^ENERGY:' charmm-gui/namd/$ofile.stdout 2> /dev/null";
+    $allE = `$cmd`;
+    $Es = explode( "\n", $allE );
+    if ( count( $Es ) < 2 ) {
+        return;
+    }
+
+    array_pop( $Es ); ## last one appears to be empty
+        
+    # $ga->tcpmessage( [ "_textarea" => end( $Es ) . "\n" ] );
+    
+    ## create plotly plot
+
+    $namd->min_e_plot->data[0]->x = [];
+    $namd->min_e_plot->data[0]->y = [];
+    $lastt = 0;
+
+    foreach ( $Es as $v ) {
+        $l = preg_split( "/\s+/", $v );
+        if ( count( $l ) > 14 ) {
+            $lastt = intval( $l[1] );
+            $namd->min_e_plot->data[0]->x[] = $l[1];
+            $namd->min_e_plot->data[0]->y[] = $l[14];
+                
+            # $ga->tcpmessage( [ "_textarea" => "data $l[1] $l[14]\n" ] );
+        }
+    }
+        
+    if ( $message ) {
+
+        $ga->tcpmessage( [
+                             "min_e_plot" => $namd->min_e_plot
+                             ,"_progress" => $lastt / $namd->min_steps
+                         ] );
+    }        
+}
