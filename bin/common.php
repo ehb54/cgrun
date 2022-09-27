@@ -53,6 +53,7 @@ function mkdir_if_needed( $dir ) {
         return true;
     }
     mkdir( $dir, 0770 );
+    chmod( $dir, 0770 );
     return is_dir( $dir );
 }
 
