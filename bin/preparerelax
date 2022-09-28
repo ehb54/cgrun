@@ -182,6 +182,16 @@ for ( $i = 1; $i < $input->cocrounds; ++$i ) {
 ## fix up final solmin steps
 $solmin_minimization_steps[ array_key_last( $solmin_minimization_steps ) ] = $input->minsteps_final;
 
+## add equilibration
+if ( $input->equilibration_steps > 0 ) {
+    $expected_results[]          = "$cgbase/solmin_equilibrate.inp";
+    $solmin_inputs[]             = sprintf( "solmin/min1_f_pbba_coc_%s.coor", str_pad( $input->cocrounds - 1, 3, '0', STR_PAD_LEFT ) );
+    $solmin_outputs[]            = "solmin/equilibrated";
+    $solmin_jobs[]               = "solmin_equilibrate.inp";
+    $solmin_minimization_steps[] = $input->equilibration_steps;
+    $solmin_firsttimesteps[]     = end( $solmin_firsttimesteps ) + $input->minsteps_final;
+}
+
 $ga->tcpmessage( [ "_textarea" =>
                    "expected_results:\n" . implode( "\n", $expected_results ) . "\n"
                    . "solmin_inputs:\n" . implode( "\n", $solmin_inputs ) . "\n"
@@ -329,6 +339,42 @@ for ( $i = 0; $i < count( $solmin_jobs ); ++$i ) {
     chmod( "$cgbase/$solmin_jobs[$i]", 0660 );
 }
 
+## add equilibration
+if ( $input->equilibration_steps > 0 ) {
+    # start again from original step4_equilibration.inp
+
+    $inpnew = preg_replace(
+        [
+         '/^((minimize|numsteps|run|set outputname|outputName).*)$/i'
+         ,'/^coordinates.*$/i'
+         ,'/^firsttimestep.*$/i'
+        ],
+        [
+         "# $0"
+         ,"coordinates             " . end( $solmin_inputs )
+         ,"firsttimestep           " . end( $solmin_firsttimesteps )
+        ]
+        ,$inplines
+        );
+    if ( count( $inplines ) != count( $inpnew ) ) {
+        echo '{"_message":{"icon":"toast.png","text":"Error replacing values in input script<br>Try <i>load</i> again.$msg_admin"}}';
+        exit;
+    }
+
+    foreach ( [
+                  "# output"
+                  ,"outputname              " . end( $solmin_outputs )
+                  ,""
+                  ,"# run control"
+                  ,""
+                  ,"run                     " . $input->equilibration_steps
+              ] as $addline ) {
+        $inpnew[] = $addline;
+    }
+
+    file_put_contents( "$cgbase/" . end( $solmin_jobs ), implode( "\n", $inpnew ) . "\n" );
+}
+
 ## verify expected results
 
 $missing_results = [];
@@ -351,7 +397,9 @@ $cgstate->state->vacuum_ready               = false;
 $cgstate->state->solmin_ready               = true;
 $cgstate->state->maxatoms                   = $maxatoms;
 $cgstate->state->solmin_jobs                = $solmin_jobs;
-$cgstate->state->solmin_minimization_steps  = $solmin_minimization_steps;
+$cgstate->state->solmin_minimization_steps  = $solmin_minimization_steps; array_pop( $cgstate->state->solmin_minimization_steps );
+$cgstate->state->solmin_equilibration_steps = $input->equilibration_steps;
+$cgstate->state->solmin_temperature         = $input->temperature;
 
 if ( !$cgstate->save() ) {
     error_exit( "Save state failed:' . $cgstate->errors . '");

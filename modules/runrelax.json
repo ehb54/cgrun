@@ -93,6 +93,18 @@
         }
         ,{
             "role"       : "output"
+            ,"id"        : "run_e_plot"
+            ,"type"      : "plotly"
+            ,"label"     : " "
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "run_t_plot"
+            ,"type"      : "plotly"
+            ,"label"     : " "
+        }
+        ,{
+            "role"       : "output"
             ,"id"        : "min_e_plot"
             ,"type"      : "plotly"
             ,"label"     : " "

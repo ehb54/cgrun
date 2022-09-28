@@ -273,9 +273,9 @@ if ( file_exists( "charmm-gui/namd/${ofile}_results.tgz" ) ) {
 
 if ( file_exists( "charmm-gui/namd/$ofile.stdout" ) && filesize( "charmm-gui/namd/$ofile.stdout" ) > 0 ) {
     $output->min_e_plot = $namd->min_e_plot;
+    $output->run_e_plot = $namd->run_e_plot;
+    $output->run_t_plot = $namd->run_t_plot;
 }
-
-$output->gpustats = $namd->gpustats->msg;
 
 $output->_textarea = "";
 
@@ -315,7 +315,10 @@ function init_ui() {
     
     ## get total steps
 
-    $namd->min_steps = array_sum( array_map( 'intval', $cgstate->state->solmin_minimization_steps ) );
+    ## TODO should get from files in case manually adjusted
+    $namd->min_steps   = array_sum( array_map( 'intval', $cgstate->state->solmin_minimization_steps ) );
+    $namd->run_steps   = intval( $cgstate->state->solmin_equilibration_steps );
+    $namd->temperature = intval( $cgstate->state->solmin_temperature );
 
     $namd->min_e_plot = json_decode(
         '{
@@ -361,7 +364,39 @@ function init_ui() {
         }'
         );
 
-    $namd->min_e_plot->layout->xaxis->range = [0, $namd->min_steps ];
+    $namd->run_e_plot  = json_decode( json_encode( $namd->min_e_plot ) );
+    $namd->run_e_plot->layout->title = "Run TOTAL3";
+
+    $namd->run_t_plot  = json_decode( json_encode( $namd->min_e_plot ) );
+    $namd->run_t_plot->layout->title              = "Run Temperature";
+    $namd->run_t_plot->layout->yaxis->title->text = "Temperature";
+
+    if ( $namd->min_steps > 0 ) {
+        $namd->min_e_plot->layout->xaxis->range = [0, $namd->min_steps ];
+    }
+        
+    if ( $namd->run_steps > 0 ) {
+        $namd->run_e_plot->layout->xaxis->range = [$namd->min_steps, $namd->min_steps + $namd->run_steps ];
+        $namd->run_t_plot->layout->xaxis->range = [$namd->min_steps, $namd->min_steps + $namd->run_steps ];
+        if ( $namd->temperature > 0 ) {
+            $namd->run_t_plot->data[] =
+                [
+                 "x" => [ $namd->min_steps, $namd->min_steps + $namd->run_steps ]
+                 ,"y" => [ $namd->temperature, $namd->temperature ]
+                 ,"mode" => "lines"
+                 ,"line" => [
+                     "color"  => "rgba(222,0,0,0.5)"
+                     ,"dash"  => "dashdot"
+                     ,"width" => 2
+                 ]
+                ]
+                ;
+        }
+    }
+
+    # $ga->tcpmessage( [ "_textarea" => "temperature: $namd->temperature\n" . json_encode( $namd->run_t_plot, JSON_PRETTY_PRINT ) . "\n" ] );
+
+    $namd->min_plot_done = false;
 }
 
 function update_ui( $message = true ) {
@@ -386,24 +421,48 @@ function update_ui( $message = true ) {
 
     $namd->min_e_plot->data[0]->x = [];
     $namd->min_e_plot->data[0]->y = [];
+    $namd->run_e_plot->data[0]->x = [];
+    $namd->run_e_plot->data[0]->y = [];
+    $namd->run_t_plot->data[0]->x = [];
+    $namd->run_t_plot->data[0]->y = [];
+
+    $min_done = $namd->min_plot_done;
+
     $lastt = 0;
 
     foreach ( $Es as $v ) {
         $l = preg_split( "/\s+/", $v );
         if ( count( $l ) > 14 ) {
             $lastt = intval( $l[1] );
-            $namd->min_e_plot->data[0]->x[] = $l[1];
-            $namd->min_e_plot->data[0]->y[] = $l[14];
+            if ( intval( $l[1] ) < $namd->min_steps ) {
+                $namd->min_e_plot->data[0]->x[] = $l[1];
+                $namd->min_e_plot->data[0]->y[] = $l[14];
+            } else {
+                $min_done = true;
+                $namd->run_e_plot->data[0]->x[] = $l[1];
+                $namd->run_e_plot->data[0]->y[] = $l[14];
+                $namd->run_t_plot->data[0]->x[] = $l[1];
+                $namd->run_t_plot->data[0]->y[] = $l[12];
+            }
                 
             # $ga->tcpmessage( [ "_textarea" => "data $l[1] $l[14]\n" ] );
         }
     }
         
     if ( $message ) {
-
-        $ga->tcpmessage( [
-                             "min_e_plot" => $namd->min_e_plot
-                             ,"_progress" => $lastt / $namd->min_steps
-                         ] );
-    }        
+        if ( !$namd->min_plot_done ) {
+            $ga->tcpmessage( [
+                                 "min_e_plot" => $namd->min_e_plot
+                                 ,"_progress" => $lastt / ( $namd->min_steps + $namd->run_steps )
+                             ] );
+        }
+        $namd->min_plot_done = $min_done;
+        if ( $min_done ) {
+            $ga->tcpmessage( [
+                                 "run_e_plot" => $namd->run_e_plot
+                                 ,"run_t_plot" => $namd->run_t_plot
+                                 ,"_progress" => $lastt / ( $namd->min_steps + $namd->run_steps )
+                             ] );
+        }
+    }
 }

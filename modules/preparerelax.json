@@ -26,7 +26,7 @@
             ,"id"        : "minsteps_solv"
             ,"label"     : "Solvent minimization steps"
             ,"type"      : "integer"
-            ,"min"       : 1000
+            ,"min"       : 100
             ,"default"   : 20000
         }
         ,{
@@ -34,7 +34,7 @@
             ,"id"        : "minsteps_carb"
             ,"label"     : "Carb [if present] minimization steps"
             ,"type"      : "integer"
-            ,"min"       : 1000
+            ,"min"       : 100
             ,"default"   : 20000
         }
         ,{
@@ -42,7 +42,7 @@
             ,"id"        : "minsteps_coci"
             ,"label"     : "Center of coordinate intermediate minimization steps"
             ,"type"      : "integer"
-            ,"min"       : 1000
+            ,"min"       : 100
             ,"default"   : 10000
         }
         ,{
@@ -50,8 +50,24 @@
             ,"id"        : "minsteps_final"
             ,"label"     : "Final minimization steps"
             ,"type"      : "integer"
-            ,"min"       : 1000
+            ,"min"       : 100
             ,"default"   : 20000
+        }
+        ,{
+            "role"       : "input"
+            # NVT ensemble
+            ,"id"        : "equilibration_steps"
+            ,"label"     : "Equilibration steps"
+            ,"type"      : "integer"
+            ,"min"       : 100
+            ,"default"   : 125000
+        }
+        ,{
+            "role"         : "input"
+            ,"id"          : "temperature"
+            ,"label"       : "Temperature"
+            ,"type"        : "float"
+            ,"default"     : 310
         }
     ]
 }
