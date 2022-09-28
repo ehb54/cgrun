@@ -86,7 +86,16 @@
             "role"       : "output"
             ,"id"        : "pdblastdry"
             ,"type"      : "atomicstructure"
-            ,"label"     : "Last frame structure"
+            ,"label"     : "Last (equilibrated) frame structure"
+            ,"help"      : "No waters or ions included<br>Right click on structure for JSmol controls"
+            ,"width"     : "100%"
+            ,"jsmoladd"  : "ribbon only; color structure"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "pdbminlastdry"
+            ,"type"      : "atomicstructure"
+            ,"label"     : "Last minimized frame structure"
             ,"help"      : "No waters or ions included<br>Right click on structure for JSmol controls"
             ,"width"     : "100%"
             ,"jsmoladd"  : "ribbon only; color structure"

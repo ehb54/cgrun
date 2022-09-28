@@ -18,7 +18,7 @@ if ( $request === NULL ) {
 
 ## find step4_
 
-$ifile = __DIR__ . "/../results/users/$request->_logon/$request->_project/charmm-gui/namd/step4_equilibration.inp";
+$ifile = __DIR__ . "/../results/users/$request->_logon/$request->_project/charmm-gui/namd/solmin_equilibrate.inp";
 
 ## get state
 
