@@ -284,11 +284,13 @@ $inpnew = preg_replace(
      '/^((constraints|consexp|consref|conskfile|conskcol|minimize|numsteps|run|set outputname|outputName).*)$/i'
      ,'/^coordinates.*$/i'
      ,'/^firsttimestep.*$/i'
+     ,'/^dcdfreq.*$/i'
     ],
     [
      "# $0"
      ,"coordinates             __input_name__"
      ,"firsttimestep           __firsttimestep__;"
+     ,"dcdfreq                 $input->dcdfreq;"
     ]
     ,$inplines
     );
@@ -348,11 +350,13 @@ if ( $input->equilibration_steps > 0 ) {
          '/^((minimize|numsteps|run|set outputname|outputName).*)$/i'
          ,'/^coordinates.*$/i'
          ,'/^firsttimestep.*$/i'
+         ,'/^dcdfreq.*$/i'
         ],
         [
          "# $0"
          ,"coordinates             " . end( $solmin_inputs )
          ,"firsttimestep           " . end( $solmin_firsttimesteps )
+         ,"dcdfreq                 $input->dcdfreq;"
         ]
         ,$inplines
         );
@@ -397,6 +401,7 @@ $cgstate->state->vacuum_ready               = false;
 $cgstate->state->solmin_ready               = true;
 $cgstate->state->maxatoms                   = $maxatoms;
 $cgstate->state->solmin_jobs                = $solmin_jobs;
+$cgstate->state->solmin_outputs             = $solmin_outputs;
 $cgstate->state->solmin_minimization_steps  = $solmin_minimization_steps; array_pop( $cgstate->state->solmin_minimization_steps );
 $cgstate->state->solmin_equilibration_steps = $input->equilibration_steps;
 $cgstate->state->solmin_temperature         = $input->temperature;

@@ -69,5 +69,12 @@
             ,"type"        : "float"
             ,"default"     : 310
         }
+        ,{
+            "role"         : "input"
+            ,"id"          : "dcdfreq"
+            ,"label"       : "DCD output frequency"
+            ,"type"        : "float"
+            ,"default"     : 5000
+        }
     ]
 }
