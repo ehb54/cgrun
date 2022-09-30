@@ -236,7 +236,8 @@ if ( file_exists( "$cgbase/$ofile.dcd" ) ) {
                 #$ga->tcpmessage( [ "_textarea" => "nowat cmd $cmd\n" ] );
                 `$cmd 2> /dev/null`;
                 if ( file_exists( "$cgbase/${ofile}_last_dry.pdb" ) ) {
-                    $output->pdblastdry = "$fdir/$cgbase/${ofile}_last_dry.pdb";
+                    $output->pdblastdryfile = "$fdir/$cgbase/${ofile}_last_dry.pdb";
+                    $output->pdblastdry     = "$fdir/$cgbase/${ofile}_last_dry.pdb";
                 } else {
                     $ga->tcpmessage( [ "_textarea" => "Notice: failed to extract solvent from pdb, so no pdb will be created for visualization\n" ] );
                 }
@@ -258,7 +259,7 @@ if ( file_exists( "$cgbase/$ofile.dcd" ) ) {
 
 if ( !$errors ) {
     $mindcd     = $cgstate->state->solmin_outputs[count( $cgstate->state->solmin_outputs ) - 2 ];
-    $mindcdname = "minimized";
+    $mindcdname = "${ofile}_minimized";
     if ( file_exists( "$cgbase/$mindcd.dcd" ) ) {
         $cmd = "cd $cgbase && " . __DIR__ . "/util/catdcd -num $mindcd.dcd | grep -P '^Total frames' | awk '{ print \$3 }'";
         $lframe = intval( `$cmd 2>/dev/null` );
@@ -276,21 +277,22 @@ if ( !$errors ) {
                     #$ga->tcpmessage( [ "_textarea" => "nowat cmd $cmd\n" ] );
                     `$cmd 2> /dev/null`;
                     if ( file_exists( "$cgbase/${mindcdname}_last_dry.pdb" ) ) {
-                        $output->pdbminlastdry = "$fdir/$cgbase/${mindcdname}_last_dry.pdb";
+                        $output->pdbminlastdryfile = "$fdir/$cgbase/${mindcdname}_last_dry.pdb";
+                        # $output->pdbminlastdry     = "$fdir/$cgbase/${mindcdname}_last_dry.pdb";
                     } else {
-                        $ga->tcpmessage( [ "_textarea" => "Notice: failed to extract solvent from minimized pdb, so no minimized pdb will be created for visualization\n" ] );
+                        $ga->tcpmessage( [ "_textarea" => "Notice: failed to extract solvent from minimized pdb, so no minimized pdb will be created for download\n" ] );
                     }
                 } else {
-                    $ga->tcpmessage( [ "_textarea" => "Notice: mdconvert failed to create a pdb from the minimized dcd, so no minimized pdb will be created for visualization\n" ] );
+                    $ga->tcpmessage( [ "_textarea" => "Notice: mdconvert failed to create a pdb from the minimized dcd, so no minimized pdb will be created for download\n" ] );
                 }
             } else {
-                $ga->tcpmessage( [ "_textarea" => "Notice: catdcd failed to extract frames from the minimized dcd, so no minimized pdb will be created for visualization\n" ] );
+                $ga->tcpmessage( [ "_textarea" => "Notice: catdcd failed to extract frames from the minimized dcd, so no minimized pdb will be created for download\n" ] );
             }
         } else {
-            $ga->tcpmessage( [ "_textarea" => "Notice: final minimized dcd has only one frame, so no minimized pdb will be created for visualization\n" ] );
+            $ga->tcpmessage( [ "_textarea" => "Notice: final minimized dcd has only one frame, so no minimized pdb will be created for download\n" ] );
         }
     } else {
-        $ga->tcpmessage( [ "_textarea" => "Notice: No final minimized dcd file found so no minimized pdb will be created for visualization\n" ] );
+        $ga->tcpmessage( [ "_textarea" => "Notice: No final minimized dcd file found so no minimized pdb will be created for download\n" ] );
         $errors = true;
     }
 }
@@ -344,7 +346,8 @@ $output->_textarea .= "\nPRODUCTION complete\n";
 ## update state
 
 if ( !$errors ) {
-    $cgstate->state->lastoutput = end( $cgstate->state->solmin_outputs );
+    $cgstate->state->equilibrated = true;
+    $cgstate->state->lastoutput   = end( $cgstate->state->solmin_outputs );
     if ( isset( $input->lastoutput ) ) {
         $output->{'sparams-lastoutput'} = end( $cgstate->state->solmin_outputs );
     }

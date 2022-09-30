@@ -186,7 +186,7 @@ $solmin_minimization_steps[ array_key_last( $solmin_minimization_steps ) ] = $in
 if ( $input->equilibration_steps > 0 ) {
     $expected_results[]          = "$cgbase/solmin_equilibrate.inp";
     $solmin_inputs[]             = sprintf( "solmin/min1_f_pbba_coc_%s.coor", str_pad( $input->cocrounds - 1, 3, '0', STR_PAD_LEFT ) );
-    $solmin_outputs[]            = "solmin/equilibrated";
+    $solmin_outputs[]            = "solmin/solmin_equilibrate";
     $solmin_jobs[]               = "solmin_equilibrate.inp";
     $solmin_minimization_steps[] = $input->equilibration_steps;
     $solmin_firsttimesteps[]     = end( $solmin_firsttimesteps ) + $input->minsteps_final;

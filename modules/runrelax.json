@@ -84,22 +84,34 @@
         }
         ,{
             "role"       : "output"
+            ,"id"        : "pdblastdryfile"
+            ,"label"     : "Last (minimized,equilibrated) frame structure"
+            ,"type"      : "file"
+        }
+        ,{
+            "role"       : "output"
             ,"id"        : "pdblastdry"
             ,"type"      : "atomicstructure"
-            ,"label"     : "Last (equilibrated) frame structure"
+            ,"label"     : " "
             ,"help"      : "No waters or ions included<br>Right click on structure for JSmol controls"
             ,"width"     : "100%"
             ,"jsmoladd"  : "ribbon only; color structure"
         }
         ,{
             "role"       : "output"
-            ,"id"        : "pdbminlastdry"
-            ,"type"      : "atomicstructure"
-            ,"label"     : "Last minimized frame structure"
-            ,"help"      : "No waters or ions included<br>Right click on structure for JSmol controls"
-            ,"width"     : "100%"
-            ,"jsmoladd"  : "ribbon only; color structure"
+            ,"id"        : "pdbminlastdryfile"
+            ,"label"     : "Last (minimized) frame structure"
+            ,"type"      : "file"
         }
+#        ,{
+#            "role"       : "output"
+#            ,"id"        : "pdbminlastdry"
+#            ,"type"      : "atomicstructure"
+#            ,"label"     : " "
+#            ,"help"      : "No waters or ions included<br>Right click on structure for JSmol controls"
+#            ,"width"     : "100%"
+#            ,"jsmoladd"  : "ribbon only; color structure"
+#        }
         ,{
             "role"       : "output"
             ,"id"        : "run_e_plot"

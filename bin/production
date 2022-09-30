@@ -206,10 +206,11 @@ if ( !is_dir( "charmm-gui/namd" ) ) {
     exit;
 }
 
-if ( !file_exists( "charmm-gui/namd/$ifile.inp" ) ) {
-    echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
-    exit;
-}
+# not needed
+# if ( !file_exists( "charmm-gui/namd/$ifile.inp" ) ) {
+#     echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $ifile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
+#     exit;
+# }
 
 if ( !file_exists( "charmm-gui/namd/$rfile.inp" ) ) {
     echo '{"_message":{"icon":"toast.png","text":"The file <i>' . $rfile . '.inp</i> is missing.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.<br>If this problem persists, Please contact the administrators via the <i>Feedback</i> tab"}}';
