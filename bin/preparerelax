@@ -285,12 +285,14 @@ $inpnew = preg_replace(
      ,'/^coordinates.*$/i'
      ,'/^firsttimestep.*$/i'
      ,'/^dcdfreq.*$/i'
+     ,'/\$outputname/i'
     ],
     [
      "# $0"
      ,"coordinates             __input_name__"
      ,"firsttimestep           __firsttimestep__;"
      ,"dcdfreq                 $input->dcdfreq;"
+     ,"__var_outputname__"
     ]
     ,$inplines
     );
@@ -326,6 +328,7 @@ for ( $i = 0; $i < count( $solmin_jobs ); ++$i ) {
          ,"/__fixed_atoms_file__/"
          ,"/__output_name__/"
          ,"/__minimize_steps__/"
+         ,"/__var_outputname__/"
         ]
         ,
         [
@@ -334,6 +337,7 @@ for ( $i = 0; $i < count( $solmin_jobs ); ++$i ) {
          ,$solmin_faf[$i]
          ,$solmin_outputs[$i]
          ,$solmin_minimization_steps[$i]
+         ,str_replace( '_', '\_', str_replace( '/', '_', $solmin_outputs[$i] ) )
         ]
         ,$inpnew
         );
@@ -347,16 +351,18 @@ if ( $input->equilibration_steps > 0 ) {
 
     $inpnew = preg_replace(
         [
-         '/^((minimize|numsteps|run|set outputname|outputName).*)$/i'
+         '/^((minimize|numsteps|run|outputName).*)$/i'
          ,'/^coordinates.*$/i'
          ,'/^firsttimestep.*$/i'
          ,'/^dcdfreq.*$/i'
+         ,'/^\$outputname/i'
         ],
         [
          "# $0"
          ,"coordinates             " . end( $solmin_inputs )
          ,"firsttimestep           " . end( $solmin_firsttimesteps )
          ,"dcdfreq                 $input->dcdfreq;"
+         ,str_replace( '_', '\_', str_replace( '/', '_', end( $solmin_outputs ) ) )
         ]
         ,$inplines
         );
