@@ -85,7 +85,13 @@
         ,{
             "role"       : "output"
             ,"id"        : "pdblastdryfile"
-            ,"label"     : "Last (minimized,equilibrated) frame structure"
+            ,"label"     : "Last (minimized,equilibrated) DCD frame"
+            ,"type"      : "file"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "pdblastdryfilesomo"
+            ,"label"     : "Last (minimized,equilibrated) DCD frame (SOMO residue names)"
             ,"type"      : "file"
         }
         ,{
@@ -100,7 +106,13 @@
         ,{
             "role"       : "output"
             ,"id"        : "pdbminlastdryfile"
-            ,"label"     : "Last (minimized) frame structure"
+            ,"label"     : "Last (minimized) DCD frame"
+            ,"type"      : "file"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "pdbminlastdryfilesomo"
+            ,"label"     : "Last (minimized) DCD frame (SOMO residue names)"
             ,"type"      : "file"
         }
 #        ,{

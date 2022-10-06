@@ -116,7 +116,7 @@ if ( count( $missing_inps ) ) {
 }
 
 ## create the command
-$ofile = "advanced_relaxation";
+$ofile = $input->_project . "_ar";
 
 $cmd = "umask 002 && cd $cgbase && ( echo -n";
 
@@ -238,6 +238,13 @@ if ( file_exists( "$cgbase/$ofile.dcd" ) ) {
                 if ( file_exists( "$cgbase/${ofile}_last_dry.pdb" ) ) {
                     $output->pdblastdryfile = "$fdir/$cgbase/${ofile}_last_dry.pdb";
                     $output->pdblastdry     = "$fdir/$cgbase/${ofile}_last_dry.pdb";
+                    $cmd = "cd $cgbase && " . __DIR__ . "/mdutil/somopdb.pl ${ofile}_last_dry.pdb";
+                    `$cmd 2> /dev/null`;
+                    if ( file_exists( "$cgbase/${ofile}_last_dry.somo.pdb" ) ) {
+                        $output->pdblastdryfilesomo = "$fdir/$cgbase/${ofile}_last_dry.somo.pdb";
+                    } else {
+                        $ga->tcpmessage( [ "_textarea" => "Notice: failed to create somo format of minimized,equilibrated pdb\n" ] );
+                    }
                 } else {
                     $ga->tcpmessage( [ "_textarea" => "Notice: failed to extract solvent from pdb, so no pdb will be created for visualization\n" ] );
                 }
@@ -259,7 +266,7 @@ if ( file_exists( "$cgbase/$ofile.dcd" ) ) {
 
 if ( !$errors ) {
     $mindcd     = $cgstate->state->solmin_outputs[count( $cgstate->state->solmin_outputs ) - 2 ];
-    $mindcdname = "${ofile}_minimized";
+    $mindcdname = "${ofile}_min";
     if ( file_exists( "$cgbase/$mindcd.dcd" ) ) {
         $cmd = "cd $cgbase && " . __DIR__ . "/util/catdcd -num $mindcd.dcd | grep -P '^Total frames' | awk '{ print \$3 }'";
         $lframe = intval( `$cmd 2>/dev/null` );
@@ -279,6 +286,13 @@ if ( !$errors ) {
                     if ( file_exists( "$cgbase/${mindcdname}_last_dry.pdb" ) ) {
                         $output->pdbminlastdryfile = "$fdir/$cgbase/${mindcdname}_last_dry.pdb";
                         # $output->pdbminlastdry     = "$fdir/$cgbase/${mindcdname}_last_dry.pdb";
+                        $cmd = "cd $cgbase && " . __DIR__ . "/mdutil/somopdb.pl ${mindcdname}_last_dry.pdb";
+                        `$cmd 2> /dev/null`;
+                        if ( file_exists( "$cgbase/${mindcdname}_last_dry.somo.pdb" ) ) {
+                            $output->pdbminlastdryfilesomo = "$fdir/$cgbase/${mindcdname}_last_dry.somo.pdb";
+                        } else {
+                            $ga->tcpmessage( [ "_textarea" => "Notice: failed to create somo format of minimized pdb\n" ] );
+                        }
                     } else {
                         $ga->tcpmessage( [ "_textarea" => "Notice: failed to extract solvent from minimized pdb, so no minimized pdb will be created for download\n" ] );
                     }
