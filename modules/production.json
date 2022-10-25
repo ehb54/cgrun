@@ -123,7 +123,14 @@
             ,"id"        : "tgzlink"
             ,"label"     : "Archive of produced files"
             ,"type"      : "file"
-            ,"help"      : "tar.gz format. Does not include DCD which is already compressed"
+            ,"help"      : "tar.gz format. Does not include DCD which is already compressed nor the frame pdbs"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "tgzpdbs"
+            ,"label"     : "Archive of frame pdbs"
+            ,"type"      : "file"
+            ,"help"      : "tar.gz format. Includes dry pdbs of each dcd frame and an NMR-style multimodel pdb"
         }
         ,{
             "role"       : "output"
