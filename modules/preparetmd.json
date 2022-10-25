@@ -1,0 +1,43 @@
+{
+    "moduleid"    : "preparetmd"
+    ,"label"      : "Prepare"
+    ,"help"       : "Prepare TMD"
+    ,"executable" : "preparetmd"
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "module_header"
+            ,"label"     : "Prepare TMD"
+            ,"type"      : "label"
+            ,"default"   : "header4"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"        : "targetpdb"
+            ,"label"     : "Target pdb"
+            ,"type"      : "lrfile"
+            ,"help"      : "The target pdb file.<br>N.B. waterbox should have dimensions greater that the maximum extent of both the starting & final structures!"
+            ,"required"  : "true"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"        : "tmdk"
+            ,"label"     : "TMD k"
+            ,"type"      : "integer"
+            ,"default"   : 200
+            ,"min"       : 50
+            ,"max"       : 10000
+            ,"help"      : "TMDk value (default 200)"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"        : "setca"
+            ,"label"     : "Set all CA atoms as targets"
+            ,"type"      : "checkbox"
+            ,"checked"   : "true"
+            ,"help"      : "If unset, it is expected the PDB provided has altLoc set to non-zero/non-blank for all atom targets"
+        }
+    ]
+}

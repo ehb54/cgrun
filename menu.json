@@ -37,11 +37,30 @@
             ]
         }
         ,{ 
+            "id"         : "tmd"
+            ,"label"      : "TMD"
+            ,"icon"       : "pngs/simulate.png"
+            ,"modules" : [ 
+                { 
+                    "id"    : "preparetmd"
+                    ,"label" : "Prepare"
+                }
+                ,{ 
+                    "id"    : "runtmd"
+                    ,"label" : "Run"
+                }
+            ]
+        }
+        ,{ 
             "id"         : "Test"
             ,"label"      : "Test"
             ,"icon"       : "pngs/simulate.png"
             ,"modules" : [ 
                 { 
+                    "id"    : "sys_job2"
+                    ,"label" : "new job manager"
+                }
+                ,{ 
                     "id"    : "loaddefaults"
                     ,"label" : "loaddefaults"
                 }

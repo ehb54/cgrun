@@ -1,0 +1,172 @@
+#!/usr/local/bin/php
+<?php
+
+$self    = __FILE__;
+$selfd   = dirname( $self );
+$cgbase  = "charmm-gui/namd";
+$mdutils = "$selfd/mdutil";
+
+if ( count( $argv ) != 2 ) {
+    echo '{"error":"$self requires a JSON input object"}';
+    exit;
+}
+
+$json_input = $argv[1];
+
+$input = json_decode( $json_input );
+
+if ( !$input ) {
+    echo '{"error":"$self - invalid JSON."}';
+    exit;
+}
+
+$output = (object)[];
+$output->_textarea = "";
+
+include "genapp.php";
+include "datetime.php";
+
+$ga = new GenApp( $input, $output );
+$fdir = preg_replace( "/^.*\/results\//", "results/", $input->_base_directory );
+
+## process inputs here to produce output
+
+## get state
+
+require "common.php";
+$cgstate = new cgrun_state();
+
+## make sure "loaded"
+
+## is this a proper project that has been "load"'d
+
+if ( !$cgstate->state->loaded ) {
+    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not ready for equilibration,<br>Did you <i>load</i> it yet?<br>You can change projects in user configuration (top right)"}}';
+    exit;
+}
+
+if ( !$cgstate->state->equilibrated ) {
+    echo '{"_message":{"icon":"information.png","text":"The current project <i>' . $input->_project . '</i> is not yet equilibrated,<br>Did you submit <i>equilibration</i> yet?<br>You can change projects in user configuration (top right)"}}';
+    exit;
+}
+
+## are the expected directories present?
+if ( !is_dir( $cgbase ) ) {
+    echo '{"_message":{"icon":"toast.png","text":"The directory <i>$cgbase</i> does not exist. You will need to run <i>Load</i> again"}}';
+    exit;
+}
+ 
+### are the needeed dependencies present
+$dependencies =
+    [
+     "$cgbase/step3_input.pdb"
+     ,"$cgbase/step3_input.psf"
+     ,"$cgbase/step4_equilibration.inp"
+     ,"$cgbase/../step3_pbcsetup.str"
+    ];
+
+foreach ( $dependencies as $v ) {
+    if ( !file_exists( $v ) ) {
+        error_exit( "The current project <i>$input->_project</i> is missing expected file <i>$v</i>.<br>Either the loaded file is incorrect, CHARMM-gui has changed how it creates NAMD output or the file was removed after loading.$msg_admin" );
+    }
+}
+
+## check if already run ?
+## could add additional file checks - but probably not needed - the state variable should be sufficient
+if ( isset( $cgstate->state->preparetmd ) && $cgstate->state->preparetmd ) {
+    $response =
+        json_decode(
+            $ga->tcpquestion(
+                [
+                 "id"           => "q1"
+                 ,"title"       => "<h5>Project '$input->_project' has previous TMD preparation results</h5>"
+                 ,"icon"        => "warning.png"
+                 ,"text"        => ""
+                 ,"timeouttext" => "The time to respond has expired, please submit again."
+                 ,"buttons"     => [ "Erase previous results", "Cancel" ]
+                 ,"fields" => [
+                     [
+                      "id"          => "l1"
+                      ,"type"       => "label"
+                      ,"label"      => "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Previous results will be overwritten!"
+                      ,"align"      => "center"
+                     ]
+                 ]
+                ]
+
+            )
+        );
+
+    if ( $response->_response->button == "cancel" ) {
+        echo '{"_message":{"icon":"information.png","text":"Canceled"}}';
+        exit;
+    }
+}
+
+unset( $cgstate->state->preparetmd );
+if ( !$cgstate->save() ) {
+    error_exit( "Save state failed:' . $cgstate->errors . '");
+}
+
+## does tmdfile exist?
+
+if ( !isset( $input->targetpdb ) || count( $input->targetpdb ) != 1 ) {
+    error_exit( "The target pdb was not properly specified.$msg_admin" );
+}
+
+$tmd_target_pdb_original = $input->targetpdb[0];
+if ( !file_exists( "$tmd_target_pdb_original" ) ) {
+    error_exit( "The target pdb <i>$tmd_target_pdb_original</i> does not exist!$msg_admin" );
+}    
+
+## ready to begin processing
+$tmd_target_pdb         = "_tmd_target.pdb";
+$tmd_start_ref_file     = "step3_input.pdb";
+$tmd_processed_ref_file = "_tmd_ref.pdb";
+
+## compare target & source pdb non-solv atoms... must match
+## make copy of step3_input.pdb as $tmd_start;
+
+if ( !copy( "$cgbase/$tmd_start_ref_file", "$cgbase/$tmd_processed_ref_file" ) ) {
+    error_exit( "Error copying <i>$tmd_start_ref_file</i> to <i>$tmd_processed_ref_file</i>.$msg_admin" );
+}
+
+run_cmd( "umask 002 && cd $cgbase && $mdutils/pdbcutwi.pl $tmd_processed_ref_file" );
+
+## make copy of $tmd_target_pdb_original for possible modification
+
+if ( !copy( $tmd_target_pdb_original, "$cgbase/$tmd_target_pdb" ) ) {
+    error_exit( "Error copying <i>$tmd_target_pdb_original</i> to <i>$tmd_target_pdb</i>.$msg_admin" );
+}
+
+## compare atoms upto the end of $tmd_target_pdb
+### The file must contain no more atoms than the structure file and those atoms present must have the exact same index
+### as the structure file (i.e., the file may contain a truncated atom selection 'index < N' but not an arbitrary selection)
+run_cmd( "cd $cgbase && $mdutils/tmdcompatible.pl $tmd_target_pdb $tmd_processed_ref_file" );
+
+## set CAs of target if requested
+### could be further modified to provide advanced selection
+if ( isset( $input->setca ) ) {
+    $ga->tcpmessage( [ "_textarea" => "TODO: set atoms altlocs!\n" ] );
+}
+
+## done
+
+$output->_textarea .= "\nPREPARE TMD complete\n";
+
+## save state
+
+$cgstate->state->preparetmd                 = true;
+$cgstate->state->tmdfile                    = $input->targetpdb[0];
+$cgstate->state->tmdk                       = $input->tmdk;
+
+if ( !$cgstate->save() ) {
+    error_exit( "Save state failed:' . $cgstate->errors . '");
+}
+
+## log results to textarea
+
+$output->{'_textarea'} .= "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
+$output->{'_textarea'} .= "JSON input from executable:\n"  . json_encode( $input, JSON_PRETTY_PRINT )  . "\n";
+
+echo json_encode( $output );
