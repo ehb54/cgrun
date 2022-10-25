@@ -107,6 +107,8 @@ if ( !$cgstate->save() ) {
     exit;
 }
 
+$output->_project = $input->_project;
+
 ## log results to textarea
 
 $output->_textarea = "JSON output from executable:\n" . json_encode( $output, JSON_PRETTY_PRINT ) . "\n";
