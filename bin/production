@@ -311,7 +311,7 @@ $ga->tcpmessage( [ "_textarea" => "Command:\n$cmd\n" ] );
 #echo '{"_message":{"icon":"toast.png","text":"testing..."}}';
 #exit();
 
-$deletes = [ ".stdout", ".dcd", "_last.dcd", "_last.pdb", "_last_dry.pdb", "_results.tgz" ];
+$deletes = [ ".stdout", ".dcd", "_last.dcd", "_last.pdb", "_last_dry.pdb", "_results.tgz", ".pdb", ".somo.pdb", "_pdbs.tgz" ];
 
 foreach ( $deletes as $v ) {
     if ( file_exists( "charmm-gui/namd/$ofile$v" ) ) {
@@ -419,6 +419,18 @@ if ( file_exists( "charmm-gui/namd/$ofile.dcd" ) ) {
     $errors = true;
 }    
 
+## run dcd2somopdb.pl
+
+
+$cmd = "umask 002 && cd charmm-gui/namd && " . __DIR__ . "/mdutil/dcd2somopdb.pl $ofile.dcd && tar -I pigz -cf ${ofile}_pdbs.tgz ${ofile}.pdb ${ofile}.somo.pdb ${ofile}-m????.pdb";
+$ga->tcpmessage( [ "_textarea" => "Creating pdb frames from $ofile.dcd\ncommand:\n$cmd" ] );
+`( $cmd ) 2>&1 > /dev/null`;
+if ( !file_exists( "charmm-gui/namd/${ofile}_pdbs.tgz" ) ) {
+    $ga->tcpmessage( [ "_textarea" => "Notice: Failed to create pdb frames from $ofile.dcd\n" ] );
+} else {
+    $ga->tcpmessage( [ "_textarea" => "Finished creating pdb frames from $ofile.dcd\n" ] );
+}
+
 ## tar gz output
 
 $tgzfiles = [
@@ -439,6 +451,10 @@ $cmd = "cd charmm-gui/namd && tar -I pigz -cf ${ofile}_results.tgz " . implode( 
 
     
 update_ui( false );
+
+if ( file_exists( "charmm-gui/namd/${ofile}_pdbs.tgz" ) ) {
+    $output->tgzpdbs   = "$fdir/charmm-gui/namd/${ofile}_pdbs.tgz";
+}
 
 $output->inputlink  = "$fdir/charmm-gui/namd/$ofile.inp";
 if ( file_exists( "charmm-gui/namd/$ofile.dcd" ) ) {
