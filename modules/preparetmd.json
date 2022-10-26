@@ -18,7 +18,7 @@
             ,"id"        : "targetpdb"
             ,"label"     : "Target pdb"
             ,"type"      : "lrfile"
-            ,"help"      : "The target pdb file.<br>N.B. waterbox should have dimensions greater that the maximum extent of both the starting & final structures!"
+            ,"help"      : "The target pdb file.<br>N.B. waterbox should have dimensions greater that the maximum extent of both the starting & target structures!"
             ,"required"  : "true"
         }
         ,{
@@ -37,7 +37,30 @@
             ,"label"     : "Set all CA atoms as targets"
             ,"type"      : "checkbox"
             ,"checked"   : "true"
-            ,"help"      : "If unset, it is expected the PDB provided has altLoc set to non-zero/non-blank for all atom targets"
+            ,"help"      : "If unset, it is expected the PDB provided has occupancy set to non-zero/non-blank for all atom targets"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"        : "alignresidues"
+            ,"label"     : "Alignment residue numbers"
+            ,"type"      : "text"
+            ,"required"  : "true"
+            ,"pattern"   : "(\\\\d+(-\\\\d+))(,(\\\\d+(-\\\\d+)))*"
+            ,"help"      : "Residues for initial alignment of target pdb to starting pdb.<br>e.g.: 25-75,103,114-117<br>Only CA atoms are currently used for alignment<br>N.B. Currently only single chain alignment is supported"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "targetpdbused"
+            ,"label"     : "Target pdb processed"
+            ,"type"      : "file"
+            ,"help"      : "Target pdb after possible resetting of occupancy"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"        : "targetcount"
+            ,"label"     : "Count of target atoms"
+            ,"type"      : "integer"
+            ,"help"      : "Target atoms have their occupancy set to non-zero/blank"
         }
     ]
 }

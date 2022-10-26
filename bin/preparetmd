@@ -120,7 +120,7 @@ if ( !file_exists( "$tmd_target_pdb_original" ) ) {
 }    
 
 ## ready to begin processing
-$tmd_target_pdb         = "_tmd_target.pdb";
+$tmd_target_pdb         = $input->_project . "_target.pdb";
 $tmd_start_ref_file     = "step3_input.pdb";
 $tmd_processed_ref_file = "_tmd_ref.pdb";
 
@@ -139,6 +139,8 @@ if ( !copy( $tmd_target_pdb_original, "$cgbase/$tmd_target_pdb" ) ) {
     error_exit( "Error copying <i>$tmd_target_pdb_original</i> to <i>$tmd_target_pdb</i>.$msg_admin" );
 }
 
+run_cmd( "umask 002 && cd $cgbase && $mdutils/pdbcutwi.pl $tmd_target_pdb" );
+
 ## compare atoms upto the end of $tmd_target_pdb
 ### The file must contain no more atoms than the structure file and those atoms present must have the exact same index
 ### as the structure file (i.e., the file may contain a truncated atom selection 'index < N' but not an arbitrary selection)
@@ -146,18 +148,52 @@ run_cmd( "cd $cgbase && $mdutils/tmdcompatible.pl $tmd_target_pdb $tmd_processed
 
 ## set CAs of target if requested
 ### could be further modified to provide advanced selection
+$targetcount = 0;
+$pdblines = explode( "\n", file_get_contents( "$cgbase/$tmd_target_pdb" ) );
 if ( isset( $input->setca ) ) {
-    $ga->tcpmessage( [ "_textarea" => "TODO: set atoms altlocs!\n" ] );
-}
+    $pdbout   = [];
+    foreach ( $pdblines as $pdbline ) {
+        if ( preg_match( '/^(ATOM|HETATM)/', $pdbline ) ) {
+            if ( substr( $pdbline, 12, 4 ) == " CA " ) {
+                $pdbline = substr_replace( $pdbline, "  1.00", 54, 6 );
+                ++$targetcount;
+            } else {
+                $pdbline = substr_replace( $pdbline, "  0.00", 54, 6 );
+            }
+        }
+        $pdbout[] = $pdbline;
+    }
+    file_put_contents( "$cgbase/$tmd_target_pdb", implode( "\n", $pdbout ) . "\n" );
+} else {
+    foreach ( $pdblines as $pdbline ) {
+        if ( preg_match( '/^(ATOM|HETATM)/', $pdbline ) ) {
+            if ( floatval( substr( $pdbline, 54, 6 ) ) ) {
+                ++$targetcount;
+            }
+        }
+        $pdbout[] = $pdbline;
+    }
+    file_put_contents( "$cgbase/$tmd_target_pdb", implode( "\n", $pdbout ) . "\n" );
+}    
+
+## align
+
+$ga->tcpmessage( [ "_textarea" => run_cmd( "cd $cgbase && $mdutils/alignresidues.pl $input->alignresidues $tmd_target_pdb $tmd_processed_ref_file" ) ] );
 
 ## done
 
-$output->_textarea .= "\nPREPARE TMD complete\n";
+$output->targetcount    = $targetcount;
+$output->targetpdbused  = "$cgbase/$tmd_target_pdb";
+$output->_textarea     .= "\nPREPARE TMD complete\n";
+
+if ( $targetcount == 0 ) {
+    error_exit( "Target atom count is zero!" );
+}
 
 ## save state
 
 $cgstate->state->preparetmd                 = true;
-$cgstate->state->tmdfile                    = $input->targetpdb[0];
+$cgstate->state->tmdfile                    = $tmd_target_pdb;
 $cgstate->state->tmdk                       = $input->tmdk;
 
 if ( !$cgstate->save() ) {
